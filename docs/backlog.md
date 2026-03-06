@@ -384,17 +384,17 @@ Add basic quality controls.
 ### D1. Category model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 ### D2. Categorization rule model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 ### D3. Categories CRUD endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -418,7 +418,7 @@ Add basic quality controls.
 ### D4. Rules CRUD endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -441,7 +441,7 @@ Add basic quality controls.
 ### D5. Categories and rules tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
