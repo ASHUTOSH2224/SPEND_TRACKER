@@ -11,6 +11,7 @@ This milestone implements backend foundation only:
 - Alembic migration setup
 - reusable base model and timestamp mixins
 - healthcheck endpoint at `/api/v1/health`
+- local email/password authentication with JWT bearer tokens
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
@@ -49,8 +50,9 @@ utils/
 
 1. Create a local environment file from the template.
 2. Set either `DATABASE_URL` directly or the individual `POSTGRES_*` variables.
-3. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
-4. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
+3. Set `AUTH_SECRET_KEY` for JWT signing. The checked-in default is for local development only.
+4. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
+5. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
 
 Example:
 
@@ -70,6 +72,12 @@ uvicorn app.main:app --reload
 ```
 
 API docs will be available at `http://127.0.0.1:8000/docs`.
+
+Auth endpoints:
+
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
 
 If you are using the Dockerized PostgreSQL service, start it first so the default `.env` database settings resolve:
 

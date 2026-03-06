@@ -7,6 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.exceptions import AppException
 from app.schemas.common import ErrorDetail, ResponseEnvelope
 
 
@@ -38,6 +39,19 @@ def _error_response(
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(AppException)
+    def handle_app_exception(_: Request, exc: AppException) -> JSONResponse:
+        payload = ResponseEnvelope[None](
+            data=None,
+            meta={},
+            error=ErrorDetail(code=exc.code, message=exc.message, details=exc.details),
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=payload.model_dump(mode="json"),
+            headers=exc.headers,
+        )
+
     @app.exception_handler(StarletteHTTPException)
     def handle_http_exception(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         detail = exc.detail if isinstance(exc.detail, str) else "Request failed"
