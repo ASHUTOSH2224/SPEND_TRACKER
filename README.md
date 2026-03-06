@@ -4,7 +4,7 @@ Foundation scaffold for the credit-card spend tracking backend described in `doc
 
 ## Current scope
 
-This milestone implements backend foundation only:
+This milestone implements backend foundation plus the first protected MVP entities:
 - FastAPI application scaffold
 - environment-driven configuration
 - PostgreSQL-ready SQLAlchemy 2.x session management
@@ -12,10 +12,11 @@ This milestone implements backend foundation only:
 - reusable base model and timestamp mixins
 - healthcheck endpoint at `/api/v1/health`
 - local email/password authentication with JWT bearer tokens
+- authenticated cards CRUD with soft archive behavior
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
-Business endpoints and domain models are intentionally deferred to later backlog items.
+Statement ingestion, categorization, rewards, and analytics endpoints are still deferred.
 
 ## Repository layout
 
@@ -78,6 +79,14 @@ Auth endpoints:
 - `POST /api/v1/auth/signup`
 - `POST /api/v1/auth/login`
 - `GET /api/v1/auth/me`
+
+Card endpoints:
+
+- `GET /api/v1/cards`
+- `POST /api/v1/cards`
+- `GET /api/v1/cards/{card_id}`
+- `PATCH /api/v1/cards/{card_id}`
+- `DELETE /api/v1/cards/{card_id}`
 
 If you are using the Dockerized PostgreSQL service, start it first so the default `.env` database settings resolve:
 

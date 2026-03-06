@@ -38,6 +38,18 @@ def _error_response(
     return JSONResponse(status_code=status_code, content=payload.model_dump(mode="json"))
 
 
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, Exception):
+        return str(value)
+    return repr(value)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     def handle_app_exception(_: Request, exc: AppException) -> JSONResponse:
@@ -66,10 +78,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     def handle_validation_exception(_: Request, exc: RequestValidationError) -> JSONResponse:
         return _error_response(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             code="VALIDATION_ERROR",
             message="Request validation failed",
-            details={"errors": exc.errors()},
+            details={"errors": _json_safe(exc.errors())},
         )
 
 

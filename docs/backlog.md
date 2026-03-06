@@ -202,7 +202,7 @@ Add basic quality controls.
 ### B1. User model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -224,7 +224,7 @@ Add basic quality controls.
 ### B2. Password hashing and JWT auth
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -247,7 +247,7 @@ Add basic quality controls.
 ### B3. Auth endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -271,7 +271,7 @@ Add basic quality controls.
 ### B4. Auth tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -298,7 +298,7 @@ Add basic quality controls.
 ### C1. Card model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -319,7 +319,7 @@ Add basic quality controls.
 ### C2. Card CRUD service layer
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -340,7 +340,7 @@ Add basic quality controls.
 ### C3. Card endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -364,7 +364,7 @@ Add basic quality controls.
 ### C4. Card CRUD tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Acceptance Criteria**
 
