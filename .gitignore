@@ -1,0 +1,38 @@
+.DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Node / frontend
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Test and cache artifacts
+coverage/
+.cache/
