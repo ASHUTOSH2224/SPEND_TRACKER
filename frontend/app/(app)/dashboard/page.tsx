@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ChartCard } from "@/components/shared/chart-card";
+import { EmptyState } from "@/components/shared/empty-state";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { TopFilterBar } from "@/components/shared/top-filter-bar";
 import { serverApi } from "@/lib/api/server";
@@ -102,6 +103,15 @@ export default async function DashboardPage({
         </form>
       </TopFilterBar>
 
+      {!cards.data.length ? (
+        <EmptyState
+          title="Add your first card"
+          description="The dashboard will populate after you add a card and upload statement metadata."
+          actionHref="/cards"
+          actionLabel="Go to cards"
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Total Spend" value={formatCurrency(summary.data.total_spend)} helper={`Previous period ${formatCurrency(summary.data.previous_period_spend)}`} />
         <KpiCard label="Rewards Value" value={formatCurrency(summary.data.total_rewards_value)} helper={`MoM change ${formatPercent(summary.data.spend_change_pct)}`} tone="accent" />
@@ -111,79 +121,103 @@ export default async function DashboardPage({
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Spend by Category" subtitle="Duplicate transactions are excluded from financial summaries.">
-          <BarList
-            items={spendByCategory.data.map((item) => ({
-              category_name: item.category_name,
-              amount: item.amount,
-            }))}
-            labelKey="category_name"
-            valueKey="amount"
-          />
+          {spendByCategory.data.length ? (
+            <BarList
+              items={spendByCategory.data.map((item) => ({
+                category_name: item.category_name,
+                amount: item.amount,
+              }))}
+              labelKey="category_name"
+              valueKey="amount"
+            />
+          ) : (
+            <EmptyState
+              title="No category spend yet"
+              description="Upload statement metadata and imported transactions will appear here once they exist."
+              compact
+            />
+          )}
         </ChartCard>
 
         <ChartCard title="Spend by Card" subtitle={summary.data.top_card ? `Top card: ${summary.data.top_card.name}` : "No spend in range"}>
-          <BarList
-            items={spendByCard.data.map((item) => ({
-              card_name: item.card_name,
-              amount: item.amount,
-            }))}
-            labelKey="card_name"
-            valueKey="amount"
-          />
+          {spendByCard.data.length ? (
+            <BarList
+              items={spendByCard.data.map((item) => ({
+                card_name: item.card_name,
+                amount: item.amount,
+              }))}
+              labelKey="card_name"
+              valueKey="amount"
+            />
+          ) : (
+            <EmptyState title="No card spend yet" description="Spend by card will appear once transactions exist." compact />
+          )}
         </ChartCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Rewards vs Charges" subtitle="Net value = reward value minus charges.">
-          <div className="grid gap-3">
-            {rewardsVsCharges.data.map((item) => (
-              <div key={item.card_id} className="rounded-2xl border border-line bg-white/70 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium">{item.card_name}</p>
-                  <p className="text-sm text-muted">{formatCurrency(item.net_value)} net</p>
+          {rewardsVsCharges.data.length ? (
+            <div className="grid gap-3">
+              {rewardsVsCharges.data.map((item) => (
+                <div key={item.card_id} className="rounded-2xl border border-line bg-white/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium">{item.card_name}</p>
+                    <p className="text-sm text-muted">{formatCurrency(item.net_value)} net</p>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm text-muted md:grid-cols-3">
+                    <span>Spend {formatCurrency(item.total_spend)}</span>
+                    <span>Rewards {formatCurrency(item.reward_value)}</span>
+                    <span>Charges {formatCurrency(item.charges)}</span>
+                  </div>
                 </div>
-                <div className="mt-3 grid gap-2 text-sm text-muted md:grid-cols-3">
-                  <span>Spend {formatCurrency(item.total_spend)}</span>
-                  <span>Rewards {formatCurrency(item.reward_value)}</span>
-                  <span>Charges {formatCurrency(item.charges)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No rewards or charges yet" description="Card net value appears once reward events or charges exist." compact />
+          )}
         </ChartCard>
 
         <ChartCard title="Monthly Trend" subtitle="Persisted transactions and reward ledger events only.">
-          <div className="grid gap-3">
-            {monthlyTrend.data.map((item) => (
-              <div key={item.month} className="rounded-2xl border border-line bg-white/70 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium">{formatMonthLabel(item.month)}</p>
-                  <p className="text-sm text-muted">{formatCurrency(item.net_value)} net</p>
+          {monthlyTrend.data.length ? (
+            <div className="grid gap-3">
+              {monthlyTrend.data.map((item) => (
+                <div key={item.month} className="rounded-2xl border border-line bg-white/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium">{formatMonthLabel(item.month)}</p>
+                    <p className="text-sm text-muted">{formatCurrency(item.net_value)} net</p>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm text-muted md:grid-cols-3">
+                    <span>Spend {formatCurrency(item.total_spend)}</span>
+                    <span>Rewards {formatCurrency(item.reward_value)}</span>
+                    <span>Charges {formatCurrency(item.charges)}</span>
+                  </div>
                 </div>
-                <div className="mt-3 grid gap-2 text-sm text-muted md:grid-cols-3">
-                  <span>Spend {formatCurrency(item.total_spend)}</span>
-                  <span>Rewards {formatCurrency(item.reward_value)}</span>
-                  <span>Charges {formatCurrency(item.charges)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No monthly trend yet" description="Trend data appears once at least one statement month has transactions." compact />
+          )}
         </ChartCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <ChartCard title="Top Merchants" subtitle="Based on non-charge spend only.">
-          <div className="grid gap-3">
-            {topMerchants.data.map((merchant) => (
-              <div key={merchant.merchant_name} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white/70 px-4 py-3">
-                <div>
-                  <p className="font-medium">{merchant.merchant_name}</p>
-                  <p className="text-sm text-muted">{merchant.transaction_count} transactions</p>
+          {topMerchants.data.length ? (
+            <div className="grid gap-3">
+              {topMerchants.data.map((merchant) => (
+                <div key={merchant.merchant_name} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white/70 px-4 py-3">
+                  <div>
+                    <p className="font-medium">{merchant.merchant_name}</p>
+                    <p className="text-sm text-muted">{merchant.transaction_count} transactions</p>
+                  </div>
+                  <p className="font-medium">{formatCurrency(merchant.amount)}</p>
                 </div>
-                <p className="font-medium">{formatCurrency(merchant.amount)}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No merchants yet" description="Merchant rankings appear after statement transactions are available." compact />
+          )}
         </ChartCard>
 
         <ChartCard title="Needs Review" subtitle="Jump into the transactions explorer to clear manual review items.">

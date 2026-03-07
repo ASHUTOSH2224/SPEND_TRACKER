@@ -1,4 +1,5 @@
 import { UploadStatementForm } from "@/components/forms/upload-statement-form";
+import { EmptyState } from "@/components/shared/empty-state";
 import { StatusPill } from "@/components/shared/status-pill";
 import { TopFilterBar } from "@/components/shared/top-filter-bar";
 import { serverApi } from "@/lib/api/server";
@@ -16,7 +17,17 @@ export default async function UploadPage() {
         title="Upload statements"
         description="Create statement upload metadata tied to a specific card and statement period."
       >
-        <UploadStatementForm cards={cards.data} />
+        {cards.data.length ? (
+          <UploadStatementForm cards={cards.data} />
+        ) : (
+          <EmptyState
+            title="Add a card before uploading"
+            description="Statement uploads must belong to an existing card."
+            actionHref="/cards"
+            actionLabel="Go to cards"
+            compact
+          />
+        )}
       </TopFilterBar>
 
       <section className="app-panel p-5">
@@ -27,22 +38,32 @@ export default async function UploadPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3">
-          {statements.data.map((statement) => {
-            const card = cards.data.find((item) => item.id === statement.card_id);
-            return (
-              <div key={statement.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-white/70 p-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="font-medium">{card?.nickname || "Unknown card"}</p>
-                  <p className="mt-1 text-sm text-muted">
-                    {statement.file_name} • {formatDate(statement.statement_period_start)} to {formatDate(statement.statement_period_end)}
-                  </p>
+        {statements.data.length ? (
+          <div className="mt-4 grid gap-3">
+            {statements.data.map((statement) => {
+              const card = cards.data.find((item) => item.id === statement.card_id);
+              return (
+                <div key={statement.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-white/70 p-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-medium">{card?.nickname || "Unknown card"}</p>
+                    <p className="mt-1 text-sm text-muted">
+                      {statement.file_name} • {formatDate(statement.statement_period_start)} to {formatDate(statement.statement_period_end)}
+                    </p>
+                  </div>
+                  <StatusPill status={statement.upload_status} />
                 </div>
-                <StatusPill status={statement.upload_status} />
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-4">
+            <EmptyState
+              title="No uploads yet"
+              description="Recent statement metadata rows will appear here after the first upload."
+              compact
+            />
+          </div>
+        )}
       </section>
     </div>
   );

@@ -1,4 +1,6 @@
 import { StatementActions } from "@/components/forms/statement-actions";
+import { EmptyState } from "@/components/shared/empty-state";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import { StatusPill } from "@/components/shared/status-pill";
 import { TopFilterBar } from "@/components/shared/top-filter-bar";
 import { serverApi } from "@/lib/api/server";
@@ -23,6 +25,8 @@ export default async function StatementsPage({
     serverApi.statements.list(filters),
     serverApi.cards.list(),
   ]);
+  const page = Number(statements.meta.page || 1);
+  const totalPages = Number(statements.meta.total_pages || 1);
 
   return (
     <div className="grid gap-4">
@@ -53,43 +57,69 @@ export default async function StatementsPage({
         </form>
       </TopFilterBar>
 
-      <div className="app-panel overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
-            <thead className="border-b border-line bg-white/60 text-left text-xs uppercase tracking-[0.18em] text-muted">
-              <tr>
-                <th className="px-4 py-3">Card</th>
-                <th className="px-4 py-3">Period</th>
-                <th className="px-4 py-3">File</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Transactions</th>
-                <th className="px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {statements.data.map((statement) => {
-                const card = cards.data.find((item) => item.id === statement.card_id);
-                return (
-                  <tr key={statement.id} className="border-b border-line/70 last:border-b-0">
-                    <td className="px-4 py-4">{card?.nickname || "Unknown card"}</td>
-                    <td className="px-4 py-4">
-                      {formatDate(statement.statement_period_start)} to {formatDate(statement.statement_period_end)}
-                    </td>
-                    <td className="px-4 py-4">{statement.file_name}</td>
-                    <td className="px-4 py-4">
-                      <StatusPill status={statement.upload_status} />
-                    </td>
-                    <td className="px-4 py-4">{statement.transaction_count}</td>
-                    <td className="px-4 py-4">
-                      <StatementActions statementId={statement.id} />
-                    </td>
+      {statements.data.length ? (
+        <>
+          <div className="text-sm text-muted">
+            Showing {statements.data.length} statements on page {page} of {totalPages}
+          </div>
+          <div className="app-panel overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse text-sm">
+                <thead className="border-b border-line bg-white/60 text-left text-xs uppercase tracking-[0.18em] text-muted">
+                  <tr>
+                    <th className="px-4 py-3">Card</th>
+                    <th className="px-4 py-3">Period</th>
+                    <th className="px-4 py-3">File</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Transactions</th>
+                    <th className="px-4 py-3">Actions</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {statements.data.map((statement) => {
+                    const card = cards.data.find((item) => item.id === statement.card_id);
+                    return (
+                      <tr key={statement.id} className="border-b border-line/70 last:border-b-0">
+                        <td className="px-4 py-4 align-top">{card?.nickname || "Unknown card"}</td>
+                        <td className="px-4 py-4 align-top">
+                          {formatDate(statement.statement_period_start)} to {formatDate(statement.statement_period_end)}
+                        </td>
+                        <td className="px-4 py-4 align-top">
+                          <p>{statement.file_name}</p>
+                          {statement.processing_error ? (
+                            <p className="mt-1 text-xs text-danger">{statement.processing_error}</p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-4 align-top">
+                          <div className="grid gap-2">
+                            <StatusPill status={statement.upload_status} />
+                            <div className="flex flex-wrap gap-2">
+                              <StatusPill status={statement.extraction_status} />
+                              <StatusPill status={statement.categorization_status} />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 align-top">{statement.transaction_count}</td>
+                        <td className="px-4 py-4 align-top">
+                          <StatementActions statementId={statement.id} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <PaginationControls pathname="/statements" searchParams={resolved} page={page} totalPages={totalPages} />
+        </>
+      ) : (
+        <EmptyState
+          title="No statements found"
+          description="Upload history will appear here after you create your first statement metadata row."
+          actionHref="/upload"
+          actionLabel="Upload statement"
+        />
+      )}
     </div>
   );
 }

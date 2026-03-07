@@ -1,11 +1,12 @@
 "use client";
 
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { CategoryRead, TransactionRead } from "@/lib/api/types";
 import { browserApi } from "@/lib/api/browser";
 import { CategorySelect } from "@/components/shared/category-select";
+import { EmptyState } from "@/components/shared/empty-state";
 import { StatusPill } from "@/components/shared/status-pill";
 import { formatCurrency, formatDate, formatDecimal } from "@/lib/utils";
 
@@ -13,15 +14,23 @@ export function TransactionTable({
   transactions,
   categories,
   showCardColumn = true,
+  emptyTitle = "No transactions found",
+  emptyDescription = "No transactions match the current filter set.",
 }: {
   transactions: TransactionRead[];
   categories: CategoryRead[];
   showCardColumn?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(transactions);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRows(transactions);
+  }, [transactions]);
 
   async function updateTransaction(
     transactionId: string,
@@ -46,9 +55,7 @@ export function TransactionTable({
 
   if (!rows.length) {
     return (
-      <div className="app-panel p-6 text-sm text-muted">
-        No transactions match the current filter set.
-      </div>
+      <EmptyState title={emptyTitle} description={emptyDescription} compact />
     );
   }
 

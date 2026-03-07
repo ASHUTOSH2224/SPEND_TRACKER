@@ -813,7 +813,7 @@ Add basic quality controls.
 ### I5. Cards list and card detail screens
 
 **Priority:** P0
-**Status:** In Progress
+**Status:** Done
 
 **Dependencies**
 

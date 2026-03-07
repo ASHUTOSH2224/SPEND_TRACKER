@@ -4,6 +4,7 @@ import type {
   CardRead,
   CardRewardSummaryRead,
   CardSummaryRead,
+  CardUpdatePayload,
   CategoryCreatePayload,
   CategoryRead,
   DashboardSummaryRead,
@@ -49,6 +50,9 @@ export function createApiClient(request: ApiRequester) {
     cards: {
       list: () => request<CardRead[]>("/cards"),
       create: (body: CardCreatePayload) => request<CardRead>("/cards", { method: "POST", body }),
+      get: (cardId: string) => request<CardRead>(`/cards/${cardId}`),
+      update: (cardId: string, body: CardUpdatePayload) =>
+        request<CardRead>(`/cards/${cardId}`, { method: "PATCH", body }),
       summary: (cardId: string, query?: ApiRequestOptions["query"]) =>
         request<CardSummaryRead>(`/cards/${cardId}/summary`, { query }),
       rewards: (cardId: string) => request<CardRewardSummaryRead>(`/cards/${cardId}/rewards`),
@@ -62,10 +66,12 @@ export function createApiClient(request: ApiRequester) {
     categories: {
       list: () => request<CategoryRead[]>("/categories"),
       create: (body: CategoryCreatePayload) => request<CategoryRead>("/categories", { method: "POST", body }),
+      archive: (categoryId: string) => request<CategoryRead>(`/categories/${categoryId}`, { method: "DELETE" }),
     },
     rules: {
       list: () => request<RuleRead[]>("/rules"),
       create: (body: RuleCreatePayload) => request<RuleRead>("/rules", { method: "POST", body }),
+      disable: (ruleId: string) => request<RuleRead>(`/rules/${ruleId}`, { method: "DELETE" }),
     },
     uploads: {
       presign: (body: { file_name: string; content_type: string }) =>

@@ -53,6 +53,20 @@ export interface CardCreatePayload {
   reward_rule_config_json?: Record<string, unknown> | null;
 }
 
+export interface CardUpdatePayload {
+  nickname?: string | null;
+  issuer_name?: string | null;
+  network?: string | null;
+  last4?: string | null;
+  statement_cycle_day?: number | null;
+  annual_fee_expected?: ApiNumber | null;
+  joining_fee_expected?: ApiNumber | null;
+  reward_program_name?: string | null;
+  reward_type?: "points" | "cashback" | "miles" | null;
+  reward_conversion_rate?: ApiNumber | null;
+  reward_rule_config_json?: Record<string, unknown> | null;
+}
+
 export interface CategoryRead {
   id: string;
   name: string;
@@ -302,3 +316,6 @@ export interface LocalSettingsPreference {
   value: string;
   note: string;
 }
+
+export type TransactionSortBy = "txn_date" | "posted_date" | "amount" | "created_at" | "updated_at";
+export type SortOrder = "asc" | "desc";

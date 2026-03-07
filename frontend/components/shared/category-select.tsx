@@ -15,6 +15,8 @@ export function CategorySelect({
   disabled?: boolean;
   allowEmpty?: boolean;
 }) {
+  const selectableCategories = categories.filter((category) => !category.is_archived || category.id === value);
+
   return (
     <select
       className="app-select min-w-[180px]"
@@ -23,7 +25,7 @@ export function CategorySelect({
       disabled={disabled}
     >
       {value === null || allowEmpty ? <option value="">Unassigned</option> : null}
-      {categories.map((category) => (
+      {selectableCategories.map((category) => (
         <option key={category.id} value={category.id}>
           {category.name}
         </option>
