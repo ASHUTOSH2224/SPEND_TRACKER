@@ -977,6 +977,37 @@ Get reward summary for one card.
 }
 ```
 
+### GET /cards/{card_id}/charges
+Get charge summary for one card.
+
+Current MVP source:
+- values come from persisted `card_charge_summaries` rows
+- response includes `source=card_charge_summaries`
+- this endpoint does not aggregate charges live from transactions yet
+
+#### Response
+```json
+{
+  "data": {
+    "card_id": "uuid",
+    "source": "card_charge_summaries",
+    "summary_period_count": 2,
+    "annual_fee_amount": 1000,
+    "joining_fee_amount": 500,
+    "late_fee_amount": 50,
+    "finance_charge_amount": 25,
+    "emi_processing_fee_amount": 20,
+    "cash_advance_fee_amount": 5,
+    "forex_markup_amount": 10,
+    "tax_amount": 280,
+    "other_charge_amount": 25,
+    "total_charge_amount": 1915
+  },
+  "meta": {},
+  "error": null
+}
+```
+
 ### GET /reward-ledgers
 List reward events.
 

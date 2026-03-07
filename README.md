@@ -17,6 +17,8 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - authenticated statement metadata create/list/detail/retry/delete endpoints
 - transaction explorer list/detail/update/bulk-update APIs
 - transaction category audit logging for manual recategorization
+- reward ledger CRUD APIs for manual reward entries
+- card rewards and persisted charge summary endpoints
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
@@ -110,11 +112,26 @@ Transaction endpoints:
 - `PATCH /api/v1/transactions/{transaction_id}`
 - `POST /api/v1/transactions/bulk-update`
 
+Reward endpoints:
+
+- `GET /api/v1/reward-ledgers`
+- `POST /api/v1/reward-ledgers`
+- `PATCH /api/v1/reward-ledgers/{reward_ledger_id}`
+- `DELETE /api/v1/reward-ledgers/{reward_ledger_id}`
+- `GET /api/v1/cards/{card_id}/rewards`
+- `GET /api/v1/cards/{card_id}/charges`
+
 Statement delete policy for the current MVP slice:
 
 - `DELETE /api/v1/statements/{statement_id}` is blocked if the statement already has linked transactions.
 - If a statement has no linked transactions, the route removes only the statement metadata row.
 - The local fake storage backend does not delete any file blob.
+
+Charge summary source for the current MVP slice:
+
+- `GET /api/v1/cards/{card_id}/charges` reads persisted rows from `card_charge_summaries`.
+- The response exposes `source=card_charge_summaries` and `summary_period_count` so the provenance is explicit.
+- This endpoint does not derive charges live from transactions yet.
 
 If you are using the Dockerized PostgreSQL service, start it first so the default `.env` database settings resolve:
 

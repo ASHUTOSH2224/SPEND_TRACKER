@@ -609,17 +609,16 @@ Add basic quality controls.
 ### G1. Reward ledger model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 ### G2. Card charge summary model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 ### G3. Reward ledger CRUD endpoints
-
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -637,7 +636,7 @@ Add basic quality controls.
 ### G4. Card rewards and charges summary endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -658,7 +657,7 @@ Add basic quality controls.
 ### G5. Rewards and charges tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
