@@ -13,10 +13,13 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - healthcheck endpoint at `/api/v1/health`
 - local email/password authentication with JWT bearer tokens
 - authenticated cards CRUD with soft archive behavior
+- local-fake upload presign support for statement metadata
+- authenticated statement metadata create/list/detail/retry/delete endpoints
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
 Statement ingestion, categorization, rewards, and analytics endpoints are still deferred.
+This milestone only covers statement upload metadata and lifecycle state; it does not parse files yet.
 
 ## Repository layout
 
@@ -52,8 +55,9 @@ utils/
 1. Create a local environment file from the template.
 2. Set either `DATABASE_URL` directly or the individual `POSTGRES_*` variables.
 3. Set `AUTH_SECRET_KEY` for JWT signing. The checked-in default is for local development only.
-4. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
-5. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
+4. Set `STORAGE_BACKEND=local_fake` unless you are wiring a different storage adapter.
+5. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
+6. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
 
 Example:
 
@@ -87,6 +91,21 @@ Card endpoints:
 - `GET /api/v1/cards/{card_id}`
 - `PATCH /api/v1/cards/{card_id}`
 - `DELETE /api/v1/cards/{card_id}`
+
+Upload and statement metadata endpoints:
+
+- `POST /api/v1/uploads/presign`
+- `POST /api/v1/statements`
+- `GET /api/v1/statements`
+- `GET /api/v1/statements/{statement_id}`
+- `POST /api/v1/statements/{statement_id}/retry`
+- `DELETE /api/v1/statements/{statement_id}`
+
+Delete policy for the current MVP slice:
+
+- `DELETE /api/v1/statements/{statement_id}` removes only the statement metadata row.
+- No imported transactions are deleted yet because transaction ingestion is not implemented.
+- The local fake storage backend does not delete any file blob.
 
 If you are using the Dockerized PostgreSQL service, start it first so the default `.env` database settings resolve:
 

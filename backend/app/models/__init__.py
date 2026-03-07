@@ -3,6 +3,7 @@ from app.models.card import Card
 from app.models.categorization_rule import CategorizationRule
 from app.models.category import Category
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.statement import Statement
 from app.models.user import User
 
 __all__ = [
@@ -10,6 +11,7 @@ __all__ = [
     "Card",
     "CategorizationRule",
     "Category",
+    "Statement",
     "TimestampMixin",
     "UUIDPrimaryKeyMixin",
     "User",

@@ -51,6 +51,7 @@ class Settings:
     auth_jwt_algorithm: str
     auth_access_token_expire_minutes: int
     auth_password_hash_iterations: int
+    storage_backend: str
 
 
 @lru_cache
@@ -97,6 +98,7 @@ def get_settings() -> Settings:
         auth_password_hash_iterations=int(
             os.getenv("AUTH_PASSWORD_HASH_ITERATIONS", "600000")
         ),
+        storage_backend=os.getenv("STORAGE_BACKEND", "local_fake").strip().lower(),
     )
 
 

@@ -457,12 +457,12 @@ Add basic quality controls.
 ### E1. Statement model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 ### E2. Upload storage abstraction
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -479,7 +479,7 @@ Add basic quality controls.
 ### E3. Presign upload endpoint
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoint**
 
@@ -498,7 +498,7 @@ Add basic quality controls.
 ### E4. Statements CRUD-lite endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -524,7 +524,7 @@ Add basic quality controls.
 ### E5. Statement metadata tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 

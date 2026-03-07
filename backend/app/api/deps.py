@@ -11,6 +11,7 @@ from app.core.security import TokenValidationError, decode_access_token
 from app.db.session import get_session
 from app.models.user import User
 from app.services.auth import get_user_by_id
+from app.services.storage import UploadStorage, build_upload_storage
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -58,3 +59,9 @@ def get_current_user(
         )
 
     return user
+
+
+def get_upload_storage(
+    settings: Settings = Depends(get_settings),
+) -> UploadStorage:
+    return build_upload_storage(settings)

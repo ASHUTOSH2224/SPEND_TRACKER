@@ -786,7 +786,7 @@ List statements.
 #### Query Params
 - card_id
 - status
-- month
+- month (`YYYY-MM`, matched against overlapping statement periods)
 - page
 - page_size
 
@@ -798,6 +798,11 @@ Retry failed processing.
 
 ### DELETE /statements/{statement_id}
 Delete statement and optionally imported transactions based on policy.
+
+Current MVP delete policy for the metadata-only slice:
+- delete the statement metadata row
+- do not delete any transactions yet because transaction ingestion is not implemented
+- do not delete a file blob when using the local fake storage backend
 
 ---
 
@@ -1124,7 +1129,7 @@ Get pre-signed upload URL.
 ```json
 {
   "data": {
-    "upload_url": "https://storage.example.com/...",
+    "upload_url": "local-fake://statements/<user-id>/<generated-file-name>",
     "file_storage_key": "statements/user-1/hdfc_feb_2026.pdf"
   },
   "meta": {},
@@ -1240,4 +1245,3 @@ This document can now be converted into:
 3. Jira epics and tickets
 4. high-fidelity UI mockups
 5. backend service decomposition
-
