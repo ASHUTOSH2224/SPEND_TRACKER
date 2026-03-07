@@ -14,9 +14,6 @@ export function middleware(request: NextRequest) {
   }
 
   if (PUBLIC_PATHS.includes(pathname)) {
-    if (hasSession) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
     return NextResponse.next();
   }
 
