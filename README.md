@@ -15,6 +15,7 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - authenticated cards CRUD with soft archive behavior
 - local-fake upload presign support for statement metadata
 - authenticated statement metadata create/list/detail/retry/delete endpoints
+- async statement-processing scaffold with a polling worker and queued jobs
 - transaction explorer list/detail/update/bulk-update APIs
 - transaction category audit logging for manual recategorization
 - reward ledger CRUD APIs for manual reward entries
@@ -24,8 +25,11 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
-Statement ingestion and categorization are still deferred.
-This milestone only covers statement upload metadata and lifecycle state; it does not parse files yet.
+The async scaffold now queues statement-processing jobs and persists explicit
+status transitions. Bank-specific parsing and real LLM categorization are still
+deferred. The current worker uses a no-op parser, a default normalizer, a
+deterministic categorization scaffold, a merchant-history hook, and a no-op LLM
+provider stub.
 
 ## Repository layout
 
@@ -63,8 +67,9 @@ utils/
 2. Set either `DATABASE_URL` directly or the individual `POSTGRES_*` variables.
 3. Set `AUTH_SECRET_KEY` for JWT signing. The checked-in default is for local development only.
 4. Set `STORAGE_BACKEND=local_fake` unless you are wiring a different storage adapter.
-5. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
-6. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
+5. Worker defaults are `WORKER_POLL_INTERVAL_SECONDS=5`, `WORKER_BATCH_SIZE=10`, and `LLM_PROVIDER_BACKEND=noop`.
+6. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
+7. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
 
 Example:
 
@@ -84,6 +89,14 @@ uvicorn app.main:app --reload
 ```
 
 API docs will be available at `http://127.0.0.1:8000/docs`.
+
+Run the local worker in a second terminal:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -m app.workers.statement_worker
+```
 
 Auth endpoints:
 
@@ -107,6 +120,14 @@ Upload and statement metadata endpoints:
 - `GET /api/v1/statements/{statement_id}`
 - `POST /api/v1/statements/{statement_id}/retry`
 - `DELETE /api/v1/statements/{statement_id}`
+
+Statement processing scaffold behavior:
+
+- `POST /api/v1/statements` and `POST /api/v1/statements/{statement_id}/retry` enqueue a `statement_processing_jobs` row.
+- The worker updates statement statuses through `uploaded/pending/pending -> processing/running/pending -> processing/completed/running -> completed/completed/completed` on success.
+- Extraction failures mark statements `failed/failed/pending`.
+- Categorization failures mark statements `failed/completed/failed`.
+- The default parser is a no-op placeholder, so no transactions are imported until issuer-specific parsers are added.
 
 Transaction endpoints:
 
@@ -139,7 +160,7 @@ Dashboard and card analytics endpoints:
 Statement delete policy for the current MVP slice:
 
 - `DELETE /api/v1/statements/{statement_id}` is blocked if the statement already has linked transactions.
-- If a statement has no linked transactions, the route removes only the statement metadata row.
+- If a statement has no linked transactions, the route removes the statement metadata row and any queued or historical processing jobs for that statement.
 - The local fake storage backend does not delete any file blob.
 
 Charge summary source for the current MVP slice:
@@ -188,6 +209,7 @@ docker compose -f infra/docker-compose.yml up --build
 ```
 
 The PostgreSQL container is published on `localhost:5433` by default.
+The worker container runs automatically alongside the API container.
 
 Once the services are up, run migrations in the API container:
 

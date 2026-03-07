@@ -52,6 +52,9 @@ class Settings:
     auth_access_token_expire_minutes: int
     auth_password_hash_iterations: int
     storage_backend: str
+    worker_poll_interval_seconds: int
+    worker_batch_size: int
+    llm_provider_backend: str
 
 
 @lru_cache
@@ -99,6 +102,11 @@ def get_settings() -> Settings:
             os.getenv("AUTH_PASSWORD_HASH_ITERATIONS", "600000")
         ),
         storage_backend=os.getenv("STORAGE_BACKEND", "local_fake").strip().lower(),
+        worker_poll_interval_seconds=int(
+            os.getenv("WORKER_POLL_INTERVAL_SECONDS", "5")
+        ),
+        worker_batch_size=int(os.getenv("WORKER_BATCH_SIZE", "10")),
+        llm_provider_backend=os.getenv("LLM_PROVIDER_BACKEND", "noop").strip().lower(),
     )
 
 

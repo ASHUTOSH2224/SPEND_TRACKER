@@ -884,7 +884,7 @@ Add basic quality controls.
 ### J1. Worker setup
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -901,7 +901,7 @@ Add basic quality controls.
 ### J2. Statement processing job lifecycle
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -918,7 +918,7 @@ Add basic quality controls.
 ### J3. Parser interface scaffold
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -935,7 +935,7 @@ Add basic quality controls.
 ### J4. Normalization interface scaffold
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -946,7 +946,7 @@ Add basic quality controls.
 ### J5. Async pipeline tests
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -962,7 +962,7 @@ Add basic quality controls.
 ### K1. Deterministic rule engine
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -979,7 +979,7 @@ Add basic quality controls.
 ### K2. Merchant-history matching scaffold
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -990,7 +990,7 @@ Add basic quality controls.
 ### K3. LLM provider interface stub
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -1007,7 +1007,7 @@ Add basic quality controls.
 ### K4. Review queue behavior
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -1023,7 +1023,7 @@ Add basic quality controls.
 ### K5. Categorization tests
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 

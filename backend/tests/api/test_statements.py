@@ -203,9 +203,9 @@ def test_statement_create_list_detail_retry_delete_flow(client) -> None:
         "transactions_deleted": 0,
         "storage_object_deleted": False,
         "delete_policy": (
-            "Deletes only the statement metadata record in the current MVP. "
-            "No imported transactions exist yet, and the local fake storage backend "
-            "does not delete any file blob."
+            "Deletes the statement metadata row and any queued processing jobs when "
+            "no imported transactions are linked. The local fake storage backend does "
+            "not delete any file blob."
         ),
     }
 

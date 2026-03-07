@@ -464,6 +464,22 @@ Manage profile, privacy, import, and preferences.
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
+## statement_processing_jobs
+
+| column | type | notes |
+|---|---|---|
+| id | uuid pk | |
+| statement_id | uuid fk statements.id | |
+| trigger_source | varchar | create/retry |
+| status | varchar | queued/running/completed/failed |
+| attempt_count | int | incremented when claimed by worker |
+| last_error | text | nullable |
+| started_at | timestamptz | nullable |
+| finished_at | timestamptz | nullable |
+| queued_at | timestamptz | |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
 ## categories
 
 | column | type | notes |
@@ -780,6 +796,13 @@ Recommended implementation:
 }
 ```
 
+Current scaffold behavior:
+- creating a statement enqueues a background processing job
+- the default worker/parser combination does not parse issuer files yet, so successful runs can still complete with zero imported transactions
+- statement status transitions are explicit: `uploaded/pending/pending -> processing/running/pending -> processing/completed/running -> completed/completed/completed`
+- extraction failures become `failed/failed/pending`
+- categorization failures become `failed/completed/failed`
+
 ### GET /statements
 List statements.
 
@@ -801,7 +824,7 @@ Delete statement and optionally imported transactions based on policy.
 
 Current MVP delete policy for the metadata-only slice:
 - block deletion when imported transactions are linked to the statement
-- otherwise delete the statement metadata row only
+- otherwise delete the statement metadata row and any associated processing jobs
 - do not delete a file blob when using the local fake storage backend
 
 ---

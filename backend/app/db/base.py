@@ -5,6 +5,7 @@ from app.models.categorization_rule import CategorizationRule
 from app.models.category import Category
 from app.models.reward_ledger import RewardLedger
 from app.models.statement import Statement
+from app.models.statement_processing_job import StatementProcessingJob
 from app.models.transaction import Transaction
 from app.models.transaction_category_audit import TransactionCategoryAudit
 from app.models.user import User
@@ -17,6 +18,7 @@ __all__ = [
     "Category",
     "RewardLedger",
     "Statement",
+    "StatementProcessingJob",
     "Transaction",
     "TransactionCategoryAudit",
     "User",

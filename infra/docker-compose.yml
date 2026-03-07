@@ -20,6 +20,28 @@ services:
       postgres:
         condition: service_healthy
 
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/backend.Dockerfile
+    command: python -m app.workers.statement_worker
+    environment:
+      APP_ENV: docker
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-spend_tracker}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SQLALCHEMY_ECHO: ${SQLALCHEMY_ECHO:-false}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-5}
+      WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-10}
+      LLM_PROVIDER_BACKEND: ${LLM_PROVIDER_BACKEND:-noop}
+    volumes:
+      - ../backend:/app/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     environment:

@@ -9,6 +9,10 @@ from app.models.card import Card
 from app.models.statement import Statement
 from app.models.transaction import Transaction
 from app.schemas.statements import StatementCreate, StatementDeleteResult, StatementListQuery
+from app.services.statement_jobs import (
+    delete_statement_processing_jobs_for_statement,
+    enqueue_statement_processing_job,
+)
 from app.services.storage import UploadStorage
 
 
@@ -47,6 +51,11 @@ def create_statement_for_user(
     session.add(statement)
     session.commit()
     session.refresh(statement)
+    enqueue_statement_processing_job(
+        session,
+        statement_id=statement.id,
+        trigger_source="create",
+    )
     return statement
 
 
@@ -135,6 +144,11 @@ def retry_statement_for_user(
 
     session.commit()
     session.refresh(statement)
+    enqueue_statement_processing_job(
+        session,
+        statement_id=statement.id,
+        trigger_source="retry",
+    )
     return statement
 
 
@@ -164,10 +178,14 @@ def delete_statement_for_user(
         transactions_deleted=0,
         storage_object_deleted=storage_deleted,
         delete_policy=(
-            "Deletes only the statement metadata record in the current MVP. "
-            "No imported transactions exist yet, and the local fake storage backend "
-            "does not delete any file blob."
+            "Deletes the statement metadata row and any queued processing jobs when "
+            "no imported transactions are linked. The local fake storage backend does "
+            "not delete any file blob."
         ),
+    )
+    delete_statement_processing_jobs_for_statement(
+        session,
+        statement_id=statement.id,
     )
     session.delete(statement)
     session.commit()
