@@ -750,7 +750,7 @@ Add basic quality controls.
 ### I1. Frontend app scaffold
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -769,7 +769,7 @@ Add basic quality controls.
 ### I2. Shared components
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Components**
 
@@ -791,7 +791,7 @@ Add basic quality controls.
 ### I3. Auth and onboarding screens
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** In Progress
 
 **Dependencies**
 
@@ -802,7 +802,7 @@ Add basic quality controls.
 ### I4. Dashboard screen
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -813,7 +813,7 @@ Add basic quality controls.
 ### I5. Cards list and card detail screens
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** In Progress
 
 **Dependencies**
 
@@ -824,7 +824,7 @@ Add basic quality controls.
 ### I6. Statement upload and history screens
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -835,7 +835,7 @@ Add basic quality controls.
 ### I7. Transactions explorer screen
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -846,7 +846,7 @@ Add basic quality controls.
 ### I8. Categories and rules screen
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -857,7 +857,7 @@ Add basic quality controls.
 ### I9. Settings screen
 
 **Priority:** P1
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
@@ -868,7 +868,7 @@ Add basic quality controls.
 ### I10. Frontend integration and smoke tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** In Progress
 
 **Dependencies**
 

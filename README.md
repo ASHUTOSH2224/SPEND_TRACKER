@@ -20,6 +20,7 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - reward ledger CRUD APIs for manual reward entries
 - card rewards and persisted charge summary endpoints
 - dashboard analytics and card performance endpoints backed by SQL aggregations
+- Next.js frontend MVP shell with authenticated dashboard, cards, uploads, transactions, categories, statements, and settings routes
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
@@ -53,6 +54,7 @@ utils/
 ## Prerequisites
 
 - Python 3.12+
+- Node.js 20+
 - Docker and Docker Compose, if using the container workflow
 
 ## Local environment
@@ -161,6 +163,24 @@ If you are using the Dockerized PostgreSQL service, start it first so the defaul
 docker compose -f infra/docker-compose.yml up -d postgres
 ```
 
+## Run the frontend MVP shell
+
+```bash
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+The frontend runs on `http://127.0.0.1:3000` by default.
+
+Frontend integration notes:
+
+- Browser requests go through Next.js route handlers under `frontend/app/api/` so the JWT stays in an `httpOnly` session cookie.
+- Protected backend requests proxy through `frontend/app/api/v1/[...path]/route.ts` and forward the bearer token from that cookie.
+- Login, signup, logout, and session refresh use the real backend auth endpoints.
+- The settings page uses a clearly isolated temporary adapter in `frontend/lib/mocks/settings.ts` because backend settings endpoints do not exist yet.
+
 ## Run with Docker Compose
 
 ```bash
@@ -180,6 +200,12 @@ docker compose -f infra/docker-compose.yml exec api alembic upgrade head
 ```bash
 cd backend
 pytest
+```
+
+```bash
+cd frontend
+npm test
+npm run build
 ```
 
 ## Migrations

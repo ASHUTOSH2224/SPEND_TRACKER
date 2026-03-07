@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-body: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-display: "Optima", "Candara", "Trebuchet MS", sans-serif;
+  --color-canvas: #f4efe6;
+  --color-panel: #fffaf0;
+  --color-line: #d9d0c2;
+  --color-text: #1d241f;
+  --color-muted: #6f756c;
+  --color-accent: #245f53;
+  --color-accent-soft: #d8ebe5;
+  --color-danger: #9d4134;
+  --color-warning: #a56d1f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(36, 95, 83, 0.14), transparent 28%),
+    linear-gradient(180deg, #f4efe6 0%, #f0eadf 100%);
+  color: var(--color-text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-panel {
+  border: 1px solid var(--color-line);
+  border-radius: 1.25rem;
+  background: rgba(255, 250, 240, 0.9);
+  box-shadow: 0 12px 40px rgba(22, 32, 26, 0.08);
+}
+
+.app-input,
+.app-select,
+.app-textarea {
+  width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--color-text);
+  padding: 0.75rem 0.9rem;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.app-input:focus,
+.app-select:focus,
+.app-textarea:focus {
+  outline: none;
+  border-color: rgba(36, 95, 83, 0.85);
+  box-shadow: 0 0 0 4px rgba(36, 95, 83, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.app-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #f6f3eb;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  transition: transform 140ms ease, opacity 140ms ease, background 140ms ease;
+}
+
+.app-button:hover {
+  transform: translateY(-1px);
+}
+
+.app-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.app-button-secondary {
+  background: rgba(36, 95, 83, 0.12);
+  color: var(--color-accent);
+}
+
+.app-button-danger {
+  background: rgba(157, 65, 52, 0.12);
+  color: var(--color-danger);
+}
+
+.app-link {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.app-grid {
+  display: grid;
+  gap: 1rem;
+}
