@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppException
 from app.models.card import Card
 from app.models.statement import Statement
+from app.models.transaction import Transaction
 from app.schemas.statements import StatementCreate, StatementDeleteResult, StatementListQuery
 from app.services.storage import UploadStorage
 
@@ -145,6 +146,16 @@ def delete_statement_for_user(
     storage: UploadStorage,
 ) -> StatementDeleteResult:
     statement = get_statement_for_user(session, user_id=user_id, statement_id=statement_id)
+    transaction_count = session.scalar(
+        select(func.count()).where(Transaction.statement_id == statement.id)
+    ) or 0
+    if transaction_count:
+        raise AppException(
+            status_code=409,
+            code="STATEMENT_DELETE_NOT_ALLOWED",
+            message="Statements with imported transactions cannot be deleted",
+        )
+
     storage_deleted = storage.delete_object(file_storage_key=statement.file_storage_key)
 
     result = StatementDeleteResult(

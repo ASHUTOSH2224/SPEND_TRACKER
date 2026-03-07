@@ -535,7 +535,7 @@ Manage profile, privacy, import, and preferences.
 | old_category_id | uuid fk categories.id | nullable |
 | new_category_id | uuid fk categories.id | |
 | changed_by | varchar | user/system |
-| reason | text | |
+| source | varchar | manual_patch/bulk_update/etc |
 | created_at | timestamptz | |
 
 ## reward_ledgers
@@ -800,8 +800,8 @@ Retry failed processing.
 Delete statement and optionally imported transactions based on policy.
 
 Current MVP delete policy for the metadata-only slice:
-- delete the statement metadata row
-- do not delete any transactions yet because transaction ingestion is not implemented
+- block deletion when imported transactions are linked to the statement
+- otherwise delete the statement metadata row only
 - do not delete a file blob when using the local fake storage backend
 
 ---
@@ -886,6 +886,18 @@ Bulk update multiple transactions.
   "transaction_ids": ["uuid1", "uuid2"],
   "category_id": "uuid",
   "review_required": false
+}
+```
+
+#### Response
+```json
+{
+  "data": {
+    "updated_count": 2,
+    "audit_count": 2
+  },
+  "meta": {},
+  "error": null
 }
 ```
 

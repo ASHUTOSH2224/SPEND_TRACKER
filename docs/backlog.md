@@ -540,17 +540,17 @@ Add basic quality controls.
 ### F1. Transaction model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 ### F2. Category audit model and migration
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 ### F3. Transaction query service
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -569,7 +569,7 @@ Add basic quality controls.
 ### F4. Transactions endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -593,7 +593,7 @@ Add basic quality controls.
 ### F5. Transactions tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 

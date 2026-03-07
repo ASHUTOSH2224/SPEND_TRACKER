@@ -15,6 +15,8 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - authenticated cards CRUD with soft archive behavior
 - local-fake upload presign support for statement metadata
 - authenticated statement metadata create/list/detail/retry/delete endpoints
+- transaction explorer list/detail/update/bulk-update APIs
+- transaction category audit logging for manual recategorization
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
@@ -101,10 +103,17 @@ Upload and statement metadata endpoints:
 - `POST /api/v1/statements/{statement_id}/retry`
 - `DELETE /api/v1/statements/{statement_id}`
 
-Delete policy for the current MVP slice:
+Transaction endpoints:
 
-- `DELETE /api/v1/statements/{statement_id}` removes only the statement metadata row.
-- No imported transactions are deleted yet because transaction ingestion is not implemented.
+- `GET /api/v1/transactions`
+- `GET /api/v1/transactions/{transaction_id}`
+- `PATCH /api/v1/transactions/{transaction_id}`
+- `POST /api/v1/transactions/bulk-update`
+
+Statement delete policy for the current MVP slice:
+
+- `DELETE /api/v1/statements/{statement_id}` is blocked if the statement already has linked transactions.
+- If a statement has no linked transactions, the route removes only the statement metadata row.
 - The local fake storage backend does not delete any file blob.
 
 If you are using the Dockerized PostgreSQL service, start it first so the default `.env` database settings resolve:
