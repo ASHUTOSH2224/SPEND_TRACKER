@@ -13,7 +13,7 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - healthcheck endpoint at `/api/v1/health`
 - local email/password authentication with JWT bearer tokens
 - authenticated cards CRUD with soft archive behavior
-- local-fake upload presign support for statement metadata
+- local-development upload presign support backed by on-disk statement files
 - authenticated statement metadata create/list/detail/retry/delete endpoints
 - async statement-processing scaffold with a polling worker and queued jobs
 - transaction explorer list/detail/update/bulk-update APIs
@@ -27,9 +27,12 @@ This milestone implements backend foundation plus the first protected MVP entiti
 
 The async scaffold now queues statement-processing jobs and persists explicit
 status transitions. Bank-specific parsing and real LLM categorization are still
-deferred. The current worker uses a no-op parser, a default normalizer, a
-deterministic categorization scaffold, a merchant-history hook, and a no-op LLM
-provider stub.
+deferred beyond the first narrow importer. The current worker supports one real
+issuer format, `HDFC + CSV`, using the columns `Transaction Date`, `Post Date`,
+`Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`. Other
+formats still fall back to the no-op parser. The worker also uses a default
+normalizer, a deterministic categorization scaffold, a merchant-history hook,
+and a no-op LLM provider stub.
 
 ## Repository layout
 
@@ -67,9 +70,10 @@ utils/
 2. Set either `DATABASE_URL` directly or the individual `POSTGRES_*` variables.
 3. Set `AUTH_SECRET_KEY` for JWT signing. The checked-in default is for local development only.
 4. Set `STORAGE_BACKEND=local_fake` unless you are wiring a different storage adapter.
-5. Worker defaults are `WORKER_POLL_INTERVAL_SECONDS=5`, `WORKER_BATCH_SIZE=10`, and `LLM_PROVIDER_BACKEND=noop`.
-6. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
-7. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
+5. `STORAGE_LOCAL_ROOT` controls where local-development statement files are written. The default is `.local_storage/` at the repo root.
+6. Worker defaults are `WORKER_POLL_INTERVAL_SECONDS=5`, `WORKER_BATCH_SIZE=10`, and `LLM_PROVIDER_BACKEND=noop`.
+7. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
+8. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
 
 Example:
 
@@ -124,10 +128,14 @@ Upload and statement metadata endpoints:
 Statement processing scaffold behavior:
 
 - `POST /api/v1/statements` and `POST /api/v1/statements/{statement_id}/retry` enqueue a `statement_processing_jobs` row.
+- `POST /api/v1/uploads/presign` returns a local-development `upload_url` that accepts a `PUT` to write the statement file under `STORAGE_LOCAL_ROOT`.
 - The worker updates statement statuses through `uploaded/pending/pending -> processing/running/pending -> processing/completed/running -> completed/completed/completed` on success.
 - Extraction failures mark statements `failed/failed/pending`.
 - Categorization failures mark statements `failed/completed/failed`.
-- The default parser is a no-op placeholder, so no transactions are imported until issuer-specific parsers are added.
+- The first real parser supports `HDFC + CSV` with headers `Transaction Date`, `Post Date`, `Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`.
+- Imported CSV rows preserve raw parser metadata under each transaction's `metadata_json.raw_metadata`.
+- Unsupported formats still fall back to the no-op parser.
+- The worker now reads the stored statement file by `file_storage_key` before invoking the parser.
 
 Transaction endpoints:
 
@@ -161,13 +169,17 @@ Statement delete policy for the current MVP slice:
 
 - `DELETE /api/v1/statements/{statement_id}` is blocked if the statement already has linked transactions.
 - If a statement has no linked transactions, the route removes the statement metadata row and any queued or historical processing jobs for that statement.
-- The local fake storage backend does not delete any file blob.
+- The local development storage backend deletes the stored file when it exists.
 
 Charge summary source for the current MVP slice:
 
+- `card_charge_summaries` are derived rows rebuilt from imported transactions where `statement_id` is present, `is_card_charge=true`, and `duplicate_flag=false`.
+- Charge totals use explicit signed import rules: debit charge rows add to the month total, while credit charge rows subtract from it.
 - `GET /api/v1/cards/{card_id}/charges` reads persisted rows from `card_charge_summaries`.
 - The response exposes `source=card_charge_summaries` and `summary_period_count` so the provenance is explicit.
-- This endpoint does not derive charges live from transactions yet.
+- `GET /api/v1/cards/{card_id}/summary` uses the same persisted charge-summary source for its `charges`, `annual_fee`, `joining_fee`, `other_charges`, and `net_value` fields.
+- Card-summary charge fields are month-scoped by the requested summary period. `category_id` still filters spend, but it does not re-slice persisted charge summaries in MVP.
+- This card-level source of truth does not derive charges live from transactions at read time.
 
 Dashboard and card analytics assumptions for the current MVP slice:
 

@@ -75,3 +75,35 @@ export async function requestEnvelope<T>(path: string, options: ApiRequestOption
     meta: payload.meta || {},
   };
 }
+
+export async function uploadBinary(
+  url: string,
+  body: BodyInit,
+  options: { contentType?: string } = {},
+): Promise<void> {
+  const headers = new Headers();
+  if (options.contentType) {
+    headers.set("content-type", options.contentType);
+  }
+
+  const response = await fetch(url, {
+    method: "PUT",
+    body,
+    headers,
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+
+  if (response.ok) {
+    return;
+  }
+
+  const payload = (await response.json().catch(() => null)) as ResponseEnvelope<unknown> | null;
+  const error = payload?.error;
+  throw new ApiClientError(
+    response.status,
+    error?.code || "UPLOAD_FAILED",
+    error?.message || "Upload failed",
+    error?.details || null,
+  );
+}

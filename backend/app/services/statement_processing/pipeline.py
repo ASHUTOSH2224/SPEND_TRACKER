@@ -4,18 +4,27 @@ from uuid import UUID
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.models.card import Card
 from app.models.statement import Statement
 from app.models.transaction import Transaction
 from app.queries.statement_processing import source_hash_exists_for_user
+from app.services.charge_summaries import (
+    charge_summary_periods_from_dates,
+    get_statement_charge_summary_periods,
+    refresh_card_charge_summaries_for_periods,
+)
 from app.services.statement_processing.categorization import HybridTransactionCategorizer
 from app.services.statement_processing.llm import get_llm_category_provider
 from app.services.statement_processing.normalization import DefaultStatementNormalizer
-from app.services.statement_processing.parsers import NoOpStatementParser
+from app.services.statement_processing.parsers import select_statement_parser
 from app.services.statement_processing.types import (
     LLMCategoryProvider,
     StatementNormalizer,
+    StatementFilePayload,
     StatementParser,
 )
+from app.services.storage import UploadStorage, build_upload_storage
 
 LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +33,7 @@ def process_statement(
     session: Session,
     *,
     statement_id: UUID,
+    storage: UploadStorage | None = None,
     parser: StatementParser | None = None,
     normalizer: StatementNormalizer | None = None,
     llm_provider: LLMCategoryProvider | None = None,
@@ -31,9 +41,16 @@ def process_statement(
     statement = session.get(Statement, statement_id)
     if statement is None:
         raise ValueError(f"Statement {statement_id} not found")
+    card = session.get(Card, statement.card_id)
+    if card is None:
+        raise ValueError(f"Card {statement.card_id} not found for statement {statement_id}")
 
-    parser_impl = parser or NoOpStatementParser()
+    parser_impl = parser or select_statement_parser(
+        statement=statement,
+        issuer_name=card.issuer_name,
+    )
     normalizer_impl = normalizer or DefaultStatementNormalizer()
+    storage_impl = storage or build_upload_storage(get_settings())
     categorizer = HybridTransactionCategorizer(
         session,
         llm_provider=llm_provider or get_llm_category_provider(),
@@ -41,13 +58,38 @@ def process_statement(
 
     LOGGER.info("statement_processing_started statement_id=%s", statement_id)
     _mark_extraction_running(session, statement)
+    charge_summary_periods = get_statement_charge_summary_periods(
+        session,
+        statement=statement,
+    )
     session.execute(
         delete(Transaction).where(Transaction.statement_id == statement_id)
+    )
+    refresh_card_charge_summaries_for_periods(
+        session,
+        user_id=statement.user_id,
+        card_id=statement.card_id,
+        period_months=charge_summary_periods,
     )
     session.commit()
 
     try:
-        parsed_statement = parser_impl.parse(statement=statement)
+        if not storage_impl.is_owned_key(
+            user_id=statement.user_id,
+            file_storage_key=statement.file_storage_key,
+        ):
+            raise ValueError("file_storage_key must belong to the statement user")
+        statement_file = StatementFilePayload(
+            file_storage_key=statement.file_storage_key,
+            file_name=statement.file_name,
+            content_bytes=storage_impl.get_object_bytes(
+                file_storage_key=statement.file_storage_key
+            ),
+        )
+        parsed_statement = parser_impl.parse(
+            statement=statement,
+            statement_file=statement_file,
+        )
         normalized_rows = normalizer_impl.normalize(
             statement=statement,
             parsed_statement=parsed_statement,
@@ -74,6 +116,7 @@ def process_statement(
 
         seen_source_hashes: set[str] = set()
         transaction_count = 0
+        imported_charge_dates: list = []
         for normalized_row in normalized_rows:
             decision = categorizer.categorize(
                 user_id=refreshed_statement.user_id,
@@ -87,6 +130,8 @@ def process_statement(
             )
             if normalized_row.source_hash:
                 seen_source_hashes.add(normalized_row.source_hash)
+            if normalized_row.is_card_charge:
+                imported_charge_dates.append(normalized_row.txn_date)
 
             session.add(
                 Transaction(
@@ -118,6 +163,13 @@ def process_statement(
             )
             transaction_count += 1
 
+        refresh_card_charge_summaries_for_periods(
+            session,
+            user_id=refreshed_statement.user_id,
+            card_id=refreshed_statement.card_id,
+            period_months=charge_summary_periods
+            | charge_summary_periods_from_dates(imported_charge_dates),
+        )
         refreshed_statement.upload_status = "completed"
         refreshed_statement.extraction_status = "completed"
         refreshed_statement.categorization_status = "completed"

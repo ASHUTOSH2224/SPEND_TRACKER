@@ -11,7 +11,10 @@ async function proxyRequest(
   const { path } = await context.params;
   const search = new URL(request.url).search;
   const backendUrl = `${getBackendBaseUrl()}/api/v1/${path.join("/")}${search}`;
-  const bodyText = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
+  const bodyBuffer =
+    request.method === "GET" || request.method === "HEAD"
+      ? undefined
+      : await request.arrayBuffer();
 
   const headers = new Headers();
   headers.set("accept", "application/json");
@@ -29,7 +32,7 @@ async function proxyRequest(
   const backendResponse = await fetch(backendUrl, {
     method: request.method,
     headers,
-    body: bodyText ? bodyText : undefined,
+    body: bodyBuffer && bodyBuffer.byteLength > 0 ? bodyBuffer : undefined,
     cache: "no-store",
   });
 
@@ -48,4 +51,5 @@ async function proxyRequest(
 export const GET = proxyRequest;
 export const POST = proxyRequest;
 export const PATCH = proxyRequest;
+export const PUT = proxyRequest;
 export const DELETE = proxyRequest;

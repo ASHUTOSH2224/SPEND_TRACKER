@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.db.session import get_session
 from app.models.card_charge_summary import CardChargeSummary
+from app.services.statement_jobs import process_next_statement_processing_job
 
 
 def _auth_context(client, *, email: str, full_name: str) -> tuple[dict[str, str], str]:
@@ -58,17 +59,38 @@ def _create_statement(
     file_name: str,
     period_start: str,
     period_end: str,
+    file_type: str = "pdf",
+    content_type: str = "application/pdf",
+    file_bytes: bytes | None = None,
 ) -> str:
     presign_response = client.post(
         "/api/v1/uploads/presign",
         json={
             "file_name": file_name,
-            "content_type": "application/pdf",
+            "content_type": content_type,
         },
         headers=headers,
     )
     assert presign_response.status_code == 200
-    file_storage_key = presign_response.json()["data"]["file_storage_key"]
+    presign_data = presign_response.json()["data"]
+    upload_response = client.put(
+        presign_data["upload_url"],
+        content=(
+            file_bytes
+            if file_bytes is not None
+            else (
+                b"%PDF-1.7 rewards test statement"
+                if file_type == "pdf"
+                else b"Transaction Date,Post Date,Description,Debit,Credit,Currency,Merchant\n"
+            )
+        ),
+        headers={
+            **headers,
+            "content-type": content_type,
+        },
+    )
+    assert upload_response.status_code == 200
+    file_storage_key = presign_data["file_storage_key"]
 
     create_response = client.post(
         "/api/v1/statements",
@@ -76,7 +98,7 @@ def _create_statement(
             "card_id": card_id,
             "file_name": file_name,
             "file_storage_key": file_storage_key,
-            "file_type": "pdf",
+            "file_type": file_type,
             "statement_period_start": period_start,
             "statement_period_end": period_end,
         },
@@ -84,6 +106,11 @@ def _create_statement(
     )
     assert create_response.status_code == 201
     return create_response.json()["data"]["id"]
+
+
+def _hdfc_csv_bytes(*rows: str) -> bytes:
+    header = "Transaction Date,Post Date,Description,Debit,Credit,Currency,Merchant\n"
+    return (header + "\n".join(rows) + "\n").encode("utf-8")
 
 
 def _seed_charge_summary(
@@ -316,6 +343,53 @@ def test_reward_summary_and_charge_summary_endpoints(client) -> None:
     assert Decimal(str(charge_summary["tax_amount"])) == Decimal("280.00")
     assert Decimal(str(charge_summary["other_charge_amount"])) == Decimal("25.00")
     assert Decimal(str(charge_summary["total_charge_amount"])) == Decimal("1915.00")
+
+
+def test_imported_charge_summaries_drive_card_charge_and_summary_endpoints(client) -> None:
+    headers, _ = _auth_context(client, email="imported@example.com", full_name="Imported Charges")
+    card_id = _create_card(client, headers, last4="2233", nickname="Imported Charge Card")
+    statement_id = _create_statement(
+        client,
+        headers,
+        card_id=card_id,
+        file_name="imported_march_2026.csv",
+        period_start="2026-03-01",
+        period_end="2026-03-31",
+        file_type="csv",
+        content_type="text/csv",
+        file_bytes=_hdfc_csv_bytes(
+            "05/03/2026,06/03/2026,ANNUAL FEE 2026,1500.00,,INR,HDFC",
+            "06/03/2026,06/03/2026,BANK CHARGE GST,270.00,,INR,HDFC",
+            "07/03/2026,07/03/2026,SWIGGY ORDER,540.00,,INR,Swiggy",
+        ),
+    )
+    assert statement_id
+
+    with get_session() as session:
+        processed_job = process_next_statement_processing_job(session)
+        assert processed_job is not None
+        assert processed_job.status == "completed"
+
+    charge_summary_response = client.get(f"/api/v1/cards/{card_id}/charges", headers=headers)
+    assert charge_summary_response.status_code == 200
+    charge_summary = charge_summary_response.json()["data"]
+    assert charge_summary["source"] == "card_charge_summaries"
+    assert charge_summary["summary_period_count"] == 1
+    assert Decimal(str(charge_summary["annual_fee_amount"])) == Decimal("1500.00")
+    assert Decimal(str(charge_summary["tax_amount"])) == Decimal("270.00")
+    assert Decimal(str(charge_summary["total_charge_amount"])) == Decimal("1770.00")
+
+    card_summary_response = client.get(
+        f"/api/v1/cards/{card_id}/summary",
+        params={"from_date": "2026-03-01", "to_date": "2026-03-31"},
+        headers=headers,
+    )
+    assert card_summary_response.status_code == 200
+    card_summary = card_summary_response.json()["data"]
+    assert Decimal(str(card_summary["charges"])) == Decimal("1770.00")
+    assert Decimal(str(card_summary["annual_fee"])) == Decimal("1500.00")
+    assert Decimal(str(card_summary["joining_fee"])) == Decimal("0.00")
+    assert Decimal(str(card_summary["other_charges"])) == Decimal("270.00")
 
 
 def test_reward_and_charge_endpoints_enforce_ownership_and_validation(client) -> None:

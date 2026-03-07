@@ -798,10 +798,12 @@ Recommended implementation:
 
 Current scaffold behavior:
 - creating a statement enqueues a background processing job
-- the default worker/parser combination does not parse issuer files yet, so successful runs can still complete with zero imported transactions
+- the first real parser supports `HDFC + CSV` with the headers `Transaction Date`, `Post Date`, `Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`
+- unsupported files still fall back to the no-op parser, so successful runs can still complete with zero imported transactions
 - statement status transitions are explicit: `uploaded/pending/pending -> processing/running/pending -> processing/completed/running -> completed/completed/completed`
 - extraction failures become `failed/failed/pending`
 - categorization failures become `failed/completed/failed`
+- imported rows preserve raw parser metadata under `transactions.metadata_json.raw_metadata`
 
 ### GET /statements
 List statements.
@@ -822,10 +824,10 @@ Retry failed processing.
 ### DELETE /statements/{statement_id}
 Delete statement and optionally imported transactions based on policy.
 
-Current MVP delete policy for the metadata-only slice:
+Current MVP delete policy for the local-development storage slice:
 - block deletion when imported transactions are linked to the statement
 - otherwise delete the statement metadata row and any associated processing jobs
-- do not delete a file blob when using the local fake storage backend
+- delete the stored local file when it exists
 
 ---
 
@@ -1005,6 +1007,8 @@ Get charge summary for one card.
 
 Current MVP source:
 - values come from persisted `card_charge_summaries` rows
+- those summary rows are derived from imported transactions where `statement_id` is present, `is_card_charge=true`, and `duplicate_flag=false`
+- debit charge rows add to the monthly total and credit charge rows subtract from it
 - response includes `source=card_charge_summaries`
 - this endpoint does not aggregate charges live from transactions yet
 
@@ -1248,6 +1252,8 @@ Get detailed card KPIs.
 - `eligible_spend` currently matches `total_spend` because MVP does not yet model issuer-specific reward eligibility rules.
 - `reward_points` is the signed reward-ledger balance for the filtered period.
 - `reward_value` follows the same signed reward-value rule as dashboard analytics.
+- `charges`, `annual_fee`, `joining_fee`, and `other_charges` come from persisted `card_charge_summaries` rows that overlap the requested summary period.
+- `category_id` filters the spend side of card summary metrics, but it does not re-slice persisted charge summaries in MVP.
 - `net_value = reward_value - charges`.
 
 ### GET /cards/{card_id}/transactions
@@ -1297,13 +1303,15 @@ Get pre-signed upload URL.
 ```json
 {
   "data": {
-    "upload_url": "local-fake://statements/<user-id>/<generated-file-name>",
+    "upload_url": "/api/v1/uploads/content?file_storage_key=statements%2F<user-id>%2F<generated-file-name>",
     "file_storage_key": "statements/user-1/hdfc_feb_2026.pdf"
   },
   "meta": {},
   "error": null
 }
 ```
+
+For the local-development backend, `upload_url` is a relative `PUT` endpoint that writes the uploaded file to local disk before statement metadata is created.
 
 ---
 

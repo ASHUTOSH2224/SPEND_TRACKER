@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 
 import { browserAuth } from "@/lib/auth/browser";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({
+  mode,
+  statusMessage,
+}: {
+  mode: "login" | "signup";
+  statusMessage?: string | null;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -21,6 +27,12 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <p className="mt-3 text-sm text-muted">
           Use your backend auth account to enter the MVP shell. OAuth is not wired yet.
         </p>
+
+        {statusMessage ? (
+          <p className="mt-4 rounded-2xl bg-[rgba(165,109,31,0.1)] px-4 py-3 text-sm text-warning">
+            {statusMessage}
+          </p>
+        ) : null}
 
         <form
           className="mt-8 grid gap-4"

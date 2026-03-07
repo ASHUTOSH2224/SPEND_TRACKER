@@ -44,7 +44,7 @@ export function Sidebar() {
       </nav>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
-        Uploads are metadata-only while the local fake storage adapter is active.
+        Local development uploads are stored on disk before the statement job is queued.
       </div>
     </aside>
   );

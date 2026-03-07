@@ -15,6 +15,7 @@ from app.services.statement_processing.types import (
     StatementNormalizer,
     StatementParser,
 )
+from app.services.storage import UploadStorage
 
 
 def enqueue_statement_processing_job(
@@ -107,6 +108,7 @@ def delete_statement_processing_jobs_for_statement(
 def process_next_statement_processing_job(
     session: Session,
     *,
+    storage: UploadStorage | None = None,
     parser: StatementParser | None = None,
     normalizer: StatementNormalizer | None = None,
     llm_provider: LLMCategoryProvider | None = None,
@@ -119,6 +121,7 @@ def process_next_statement_processing_job(
         process_statement(
             session,
             statement_id=job.statement_id,
+            storage=storage,
             parser=parser,
             normalizer=normalizer,
             llm_provider=llm_provider,

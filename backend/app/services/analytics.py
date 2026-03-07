@@ -8,7 +8,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.queries.analytics import (
-    get_charge_breakdown,
     get_dashboard_summary_metrics,
     get_reward_summary,
     get_total_charges,
@@ -19,6 +18,7 @@ from app.queries.analytics import (
     list_spend_by_category,
     list_top_merchants,
 )
+from app.queries.rewards import get_card_charge_summary
 from app.schemas.dashboard import (
     AnalyticsFilterQuery,
     CardAnalyticsFilterQuery,
@@ -284,11 +284,12 @@ def get_card_summary_for_user(
         filters=summary_filters,
         card_id=card.id,
     )
-    charges = get_charge_breakdown(
+    charges = get_card_charge_summary(
         session,
         user_id=user_id,
-        filters=summary_filters,
         card_id=card.id,
+        from_date=current_start,
+        to_date=current_end,
     )
 
     return CardSummaryRead(
@@ -302,11 +303,19 @@ def get_card_summary_for_user(
         eligible_spend=total_spend,
         reward_points=reward_summary.reward_points,
         reward_value=reward_summary.reward_value,
-        charges=charges.charges,
-        annual_fee=charges.annual_fee,
-        joining_fee=charges.joining_fee,
-        other_charges=charges.other_charges,
-        net_value=reward_summary.reward_value - charges.charges,
+        charges=charges.total_charge_amount,
+        annual_fee=charges.annual_fee_amount,
+        joining_fee=charges.joining_fee_amount,
+        other_charges=(
+            charges.late_fee_amount
+            + charges.finance_charge_amount
+            + charges.emi_processing_fee_amount
+            + charges.cash_advance_fee_amount
+            + charges.forex_markup_amount
+            + charges.tax_amount
+            + charges.other_charge_amount
+        ),
+        net_value=reward_summary.reward_value - charges.total_charge_amount,
     )
 
 

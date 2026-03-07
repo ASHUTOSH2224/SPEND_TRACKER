@@ -204,8 +204,8 @@ def test_statement_create_list_detail_retry_delete_flow(client) -> None:
         "storage_object_deleted": False,
         "delete_policy": (
             "Deletes the statement metadata row and any queued processing jobs when "
-            "no imported transactions are linked. The local fake storage backend does "
-            "not delete any file blob."
+            "no imported transactions are linked. The local development storage "
+            "backend deletes the stored file when it exists."
         ),
     }
 

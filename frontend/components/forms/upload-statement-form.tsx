@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import type { CardRead } from "@/lib/api/types";
 import { browserApi } from "@/lib/api/browser";
+import { uploadBinary } from "@/lib/api/http";
 import { UploadDropzone } from "@/components/shared/upload-dropzone";
 import { inferContentType, inferStatementFileType } from "@/lib/utils";
 
@@ -41,15 +42,9 @@ export function UploadStatementForm({ cards }: { cards: CardRead[] }) {
               content_type: contentType,
             });
 
-            if (!presign.data.upload_url.startsWith("local-fake://")) {
-              await fetch(presign.data.upload_url, {
-                method: "PUT",
-                body: selectedFile,
-                headers: {
-                  "content-type": contentType,
-                },
-              });
-            }
+            await uploadBinary(presign.data.upload_url, selectedFile, {
+              contentType,
+            });
 
             await browserApi.statements.create({
               card_id: cardId,
@@ -62,7 +57,7 @@ export function UploadStatementForm({ cards }: { cards: CardRead[] }) {
 
             setSelectedFile(null);
             form.reset();
-            setMessage("Statement metadata created successfully.");
+            setMessage("Statement uploaded and queued successfully.");
             router.refresh();
           } catch (submissionError) {
             setMessage(submissionError instanceof Error ? submissionError.message : "Upload failed");
@@ -102,10 +97,10 @@ export function UploadStatementForm({ cards }: { cards: CardRead[] }) {
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted">
-          Local fake storage skips the actual blob upload and creates only the upload metadata row.
+          Local development storage writes the uploaded file before creating statement metadata.
         </p>
         <button className="app-button" type="submit" disabled={pending}>
-          {pending ? "Creating..." : "Create statement upload"}
+          {pending ? "Uploading..." : "Upload statement"}
         </button>
       </div>
 

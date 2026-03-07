@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -32,6 +33,12 @@ class CardChargeSummaryRow:
     forex_markup_amount: Decimal
     tax_amount: Decimal
     other_charge_amount: Decimal
+    total_charge_amount: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class CardChargeSummaryMonthRow:
+    period_month: date
     total_charge_amount: Decimal
 
 
@@ -122,23 +129,28 @@ def get_card_charge_summary(
     *,
     user_id: UUID,
     card_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
 ) -> CardChargeSummaryRow:
     row = session.execute(
-        select(
-            func.count(CardChargeSummary.id).label("summary_period_count"),
-            func.coalesce(func.sum(CardChargeSummary.annual_fee_amount), 0).label("annual_fee_amount"),
-            func.coalesce(func.sum(CardChargeSummary.joining_fee_amount), 0).label("joining_fee_amount"),
-            func.coalesce(func.sum(CardChargeSummary.late_fee_amount), 0).label("late_fee_amount"),
-            func.coalesce(func.sum(CardChargeSummary.finance_charge_amount), 0).label("finance_charge_amount"),
-            func.coalesce(func.sum(CardChargeSummary.emi_processing_fee_amount), 0).label("emi_processing_fee_amount"),
-            func.coalesce(func.sum(CardChargeSummary.cash_advance_fee_amount), 0).label("cash_advance_fee_amount"),
-            func.coalesce(func.sum(CardChargeSummary.forex_markup_amount), 0).label("forex_markup_amount"),
-            func.coalesce(func.sum(CardChargeSummary.tax_amount), 0).label("tax_amount"),
-            func.coalesce(func.sum(CardChargeSummary.other_charge_amount), 0).label("other_charge_amount"),
-            func.coalesce(func.sum(CardChargeSummary.total_charge_amount), 0).label("total_charge_amount"),
-        ).where(
-            CardChargeSummary.user_id == user_id,
-            CardChargeSummary.card_id == card_id,
+        _apply_card_charge_summary_filters(
+            select(
+                func.count(CardChargeSummary.id).label("summary_period_count"),
+                func.coalesce(func.sum(CardChargeSummary.annual_fee_amount), 0).label("annual_fee_amount"),
+                func.coalesce(func.sum(CardChargeSummary.joining_fee_amount), 0).label("joining_fee_amount"),
+                func.coalesce(func.sum(CardChargeSummary.late_fee_amount), 0).label("late_fee_amount"),
+                func.coalesce(func.sum(CardChargeSummary.finance_charge_amount), 0).label("finance_charge_amount"),
+                func.coalesce(func.sum(CardChargeSummary.emi_processing_fee_amount), 0).label("emi_processing_fee_amount"),
+                func.coalesce(func.sum(CardChargeSummary.cash_advance_fee_amount), 0).label("cash_advance_fee_amount"),
+                func.coalesce(func.sum(CardChargeSummary.forex_markup_amount), 0).label("forex_markup_amount"),
+                func.coalesce(func.sum(CardChargeSummary.tax_amount), 0).label("tax_amount"),
+                func.coalesce(func.sum(CardChargeSummary.other_charge_amount), 0).label("other_charge_amount"),
+                func.coalesce(func.sum(CardChargeSummary.total_charge_amount), 0).label("total_charge_amount"),
+            ),
+            user_id=user_id,
+            card_id=card_id,
+            from_date=from_date,
+            to_date=to_date,
         )
     ).one()
 
@@ -155,3 +167,55 @@ def get_card_charge_summary(
         other_charge_amount=row.other_charge_amount,
         total_charge_amount=row.total_charge_amount,
     )
+
+
+def list_card_charge_summary_months(
+    session: Session,
+    *,
+    user_id: UUID,
+    card_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> list[CardChargeSummaryMonthRow]:
+    rows = session.execute(
+        _apply_card_charge_summary_filters(
+            select(
+                CardChargeSummary.period_month,
+                CardChargeSummary.total_charge_amount,
+            ).order_by(CardChargeSummary.period_month.asc()),
+            user_id=user_id,
+            card_id=card_id,
+            from_date=from_date,
+            to_date=to_date,
+        )
+    ).all()
+    return [
+        CardChargeSummaryMonthRow(
+            period_month=row.period_month,
+            total_charge_amount=row.total_charge_amount,
+        )
+        for row in rows
+    ]
+
+
+def _apply_card_charge_summary_filters(
+    statement: Select,
+    *,
+    user_id: UUID,
+    card_id: UUID,
+    from_date: date | None,
+    to_date: date | None,
+) -> Select:
+    statement = statement.where(
+        CardChargeSummary.user_id == user_id,
+        CardChargeSummary.card_id == card_id,
+    )
+    if from_date is not None:
+        statement = statement.where(
+            CardChargeSummary.period_month >= from_date.replace(day=1)
+        )
+    if to_date is not None:
+        statement = statement.where(
+            CardChargeSummary.period_month <= to_date.replace(day=1)
+        )
+    return statement

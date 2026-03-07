@@ -9,6 +9,10 @@ from app.models.card import Card
 from app.models.statement import Statement
 from app.models.transaction import Transaction
 from app.schemas.statements import StatementCreate, StatementDeleteResult, StatementListQuery
+from app.services.charge_summaries import (
+    get_statement_charge_summary_periods,
+    refresh_card_charge_summaries_for_periods,
+)
 from app.services.statement_jobs import (
     delete_statement_processing_jobs_for_statement,
     enqueue_statement_processing_job,
@@ -160,6 +164,10 @@ def delete_statement_for_user(
     storage: UploadStorage,
 ) -> StatementDeleteResult:
     statement = get_statement_for_user(session, user_id=user_id, statement_id=statement_id)
+    charge_summary_periods = get_statement_charge_summary_periods(
+        session,
+        statement=statement,
+    )
     transaction_count = session.scalar(
         select(func.count()).where(Transaction.statement_id == statement.id)
     ) or 0
@@ -179,13 +187,19 @@ def delete_statement_for_user(
         storage_object_deleted=storage_deleted,
         delete_policy=(
             "Deletes the statement metadata row and any queued processing jobs when "
-            "no imported transactions are linked. The local fake storage backend does "
-            "not delete any file blob."
+            "no imported transactions are linked. The local development storage "
+            "backend deletes the stored file when it exists."
         ),
     )
     delete_statement_processing_jobs_for_statement(
         session,
         statement_id=statement.id,
+    )
+    refresh_card_charge_summaries_for_periods(
+        session,
+        user_id=statement.user_id,
+        card_id=statement.card_id,
+        period_months=charge_summary_periods,
     )
     session.delete(statement)
     session.commit()

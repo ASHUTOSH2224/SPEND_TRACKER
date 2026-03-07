@@ -26,6 +26,13 @@ class ParsedStatementResult:
 
 
 @dataclass(frozen=True, slots=True)
+class StatementFilePayload:
+    file_storage_key: str
+    file_name: str
+    content_bytes: bytes
+
+
+@dataclass(frozen=True, slots=True)
 class NormalizedTransactionRow:
     txn_date: date
     raw_description: str
@@ -54,7 +61,12 @@ class CategorizationDecision:
 
 
 class StatementParser(Protocol):
-    def parse(self, *, statement: Statement) -> ParsedStatementResult:
+    def parse(
+        self,
+        *,
+        statement: Statement,
+        statement_file: StatementFilePayload,
+    ) -> ParsedStatementResult:
         ...
 
 

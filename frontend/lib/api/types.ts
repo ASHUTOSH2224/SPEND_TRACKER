@@ -84,16 +84,18 @@ export interface CategoryCreatePayload {
 export interface RuleRead {
   id: string;
   rule_name: string;
-  match_type: "description_contains" | "merchant_equals" | "regex";
+  match_type: RuleMatchType;
   match_value: string;
   assigned_category_id: string;
   priority: number;
   is_active: boolean;
 }
 
+export type RuleMatchType = "description_contains" | "merchant_equals" | "regex";
+
 export interface RuleCreatePayload {
   rule_name: string;
-  match_type: "description_contains" | "merchant_equals" | "regex";
+  match_type: RuleMatchType;
   match_value: string;
   assigned_category_id: string;
   priority?: number;
@@ -179,8 +181,19 @@ export interface TransactionUpdatePayload {
   category_id?: string | null;
   review_required?: boolean;
   create_rule?: boolean;
-  rule_match_type?: "description_contains" | "merchant_equals" | "regex";
+  rule_match_type?: RuleMatchType;
   rule_match_value?: string;
+}
+
+export interface TransactionBulkUpdatePayload {
+  transaction_ids: string[];
+  category_id?: string | null;
+  review_required?: boolean;
+}
+
+export interface TransactionBulkUpdateResult {
+  updated_count: number;
+  audit_count: number;
 }
 
 export interface DashboardSummaryRead {
@@ -285,18 +298,42 @@ export interface CardChargeSummaryRead {
   total_charge_amount: ApiNumber;
 }
 
+export type RewardEventType = "earned" | "redeemed" | "expired" | "adjusted" | "cashback";
+export type RewardLedgerSource = "manual" | "extracted" | "estimated";
+
 export interface RewardLedgerRead {
   id: string;
   card_id: string;
   statement_id: string | null;
   event_date: string;
-  event_type: "earned" | "redeemed" | "expired" | "adjusted" | "cashback";
+  event_type: RewardEventType;
   reward_points: ApiNumber | null;
   reward_value_estimate: ApiNumber | null;
-  source: "manual" | "extracted" | "estimated";
+  source: RewardLedgerSource;
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface RewardLedgerCreatePayload {
+  card_id: string;
+  statement_id?: string | null;
+  event_date: string;
+  event_type: RewardEventType;
+  reward_points?: ApiNumber | null;
+  reward_value_estimate?: ApiNumber | null;
+  source?: RewardLedgerSource;
+  notes?: string | null;
+}
+
+export interface RewardLedgerUpdatePayload {
+  statement_id?: string | null;
+  event_date?: string;
+  event_type?: RewardEventType;
+  reward_points?: ApiNumber | null;
+  reward_value_estimate?: ApiNumber | null;
+  source?: RewardLedgerSource;
+  notes?: string | null;
 }
 
 export interface QueryFilters {

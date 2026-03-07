@@ -36,3 +36,6 @@ build/
 # Test and cache artifacts
 coverage/
 .cache/
+
+# Local development statement storage
+.local_storage/

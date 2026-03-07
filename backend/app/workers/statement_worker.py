@@ -5,13 +5,16 @@ import time
 from app.core.config import get_settings
 from app.db.session import get_session
 from app.services.statement_jobs import process_next_statement_processing_job
+from app.services.storage import build_upload_storage
 
 LOGGER = logging.getLogger(__name__)
 
 
 def run_once() -> bool:
+    settings = get_settings()
+    storage = build_upload_storage(settings)
     with get_session() as session:
-        job = process_next_statement_processing_job(session)
+        job = process_next_statement_processing_job(session, storage=storage)
         if job is None:
             return False
         LOGGER.info(

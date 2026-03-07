@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CardArchiveButton } from "@/components/forms/card-archive-button";
+import { RewardLedgerManager } from "@/components/forms/reward-ledger-manager";
 import { ChartCard } from "@/components/shared/chart-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -175,30 +176,7 @@ export default async function CardDetailPage({
       </div>
 
       <ChartCard title="Reward Events" subtitle="Manual and imported reward ledger rows for this card.">
-        {rewardEvents.data.length ? (
-          <div className="grid gap-3">
-            {rewardEvents.data.slice(0, 8).map((event) => (
-              <div key={event.id} className="grid gap-2 rounded-2xl border border-line bg-white/70 px-4 py-3 md:grid-cols-[120px_110px_minmax(0,1fr)_auto] md:items-center">
-                <p className="text-sm text-muted">{formatDate(event.event_date)}</p>
-                <StatusPill status={event.event_type} />
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-muted">{event.notes || `Source: ${event.source}`}</p>
-                </div>
-                <p className="font-medium">
-                  {event.reward_points !== null
-                    ? `${formatDecimal(event.reward_points, 0)} pts`
-                    : formatCurrency(event.reward_value_estimate)}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="No reward events yet"
-            description="Manual reward entries or imported reward rows will appear here."
-            compact
-          />
-        )}
+        <RewardLedgerManager cardId={card.data.id} rewardEvents={rewardEvents.data} />
       </ChartCard>
     </div>
   );

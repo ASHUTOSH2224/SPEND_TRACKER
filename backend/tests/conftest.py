@@ -11,6 +11,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database_path}")
     monkeypatch.setenv("AUTH_SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("AUTH_PASSWORD_HASH_ITERATIONS", "1000")
+    monkeypatch.setenv("STORAGE_LOCAL_ROOT", str(tmp_path / "statement-files"))
 
     from app.core.config import clear_settings_cache
     from app.db.session import reset_session_state

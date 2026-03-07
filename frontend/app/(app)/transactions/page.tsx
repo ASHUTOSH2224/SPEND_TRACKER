@@ -1,8 +1,15 @@
+import Link from "next/link";
+
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { TopFilterBar } from "@/components/shared/top-filter-bar";
 import { TransactionTable } from "@/components/shared/transaction-table";
 import { serverApi } from "@/lib/api/server";
-import { getBooleanSearchParam, getSearchParam, type ResolvedSearchParams } from "@/lib/search-params";
+import {
+  buildSearchPath,
+  getBooleanSearchParam,
+  getSearchParam,
+  type ResolvedSearchParams,
+} from "@/lib/search-params";
 
 export default async function TransactionsPage({
   searchParams,
@@ -29,6 +36,20 @@ export default async function TransactionsPage({
     serverApi.categories.list(),
     serverApi.cards.list(),
   ]);
+  const reviewOnlyMode = Boolean(filters.review_required);
+  const reviewVisibleCount = transactions.data.filter((transaction) => transaction.review_required).length;
+  const reviewQueueHref = buildSearchPath("/transactions", resolved, {
+    review_required: true,
+    page: 1,
+  });
+  const allTransactionsHref = buildSearchPath("/transactions", resolved, {
+    review_required: null,
+    page: 1,
+  });
+  const emptyTitle = reviewOnlyMode ? "No transactions need review" : "No transactions found";
+  const emptyDescription = reviewOnlyMode
+    ? "Low-confidence imports will appear here. Clear the filter to browse the full transaction list."
+    : "No transactions match the current filter set.";
 
   return (
     <div className="grid gap-4">
@@ -86,6 +107,24 @@ export default async function TransactionsPage({
         </form>
       </TopFilterBar>
 
+      <section className="app-panel flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="font-display text-xl font-semibold tracking-tight">
+            {reviewOnlyMode ? "Needs Review Queue" : "Manual Review Queue"}
+          </h3>
+          <p className="mt-1 text-sm text-muted">
+            {reviewOnlyMode
+              ? `${Number(transactions.meta.total || 0)} transaction${Number(transactions.meta.total || 0) === 1 ? "" : "s"} currently match the review queue.`
+              : reviewVisibleCount
+                ? `${reviewVisibleCount} transaction${reviewVisibleCount === 1 ? "" : "s"} on this page still need manual review.`
+                : "All transactions on this page are currently reviewed."}
+          </p>
+        </div>
+        <Link className="app-button app-button-secondary w-fit" href={reviewOnlyMode ? allTransactionsHref : reviewQueueHref}>
+          {reviewOnlyMode ? "Show all transactions" : "Open review queue"}
+        </Link>
+      </section>
+
       <div className="flex items-center justify-between gap-3 text-sm text-muted">
         <p>
           Showing {transactions.data.length} transactions on page {transactions.meta.page as number} of{" "}
@@ -94,7 +133,13 @@ export default async function TransactionsPage({
         <p>{transactions.meta.total as number} total rows</p>
       </div>
 
-      <TransactionTable transactions={transactions.data} categories={categories.data} />
+      <TransactionTable
+        transactions={transactions.data}
+        categories={categories.data}
+        emptyTitle={emptyTitle}
+        emptyDescription={emptyDescription}
+        reviewOnlyMode={reviewOnlyMode}
+      />
       <PaginationControls
         pathname="/transactions"
         searchParams={resolved}

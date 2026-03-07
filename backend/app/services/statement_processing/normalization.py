@@ -59,6 +59,8 @@ def _build_source_hash(
     digest.update(b"|")
     digest.update(str(row.amount).encode("utf-8"))
     digest.update(b"|")
+    digest.update(row.txn_direction.encode("utf-8"))
+    digest.update(b"|")
     digest.update(normalized_merchant.lower().encode("utf-8"))
     digest.update(b"|")
     digest.update(_collapse_whitespace(row.description).lower().encode("utf-8"))

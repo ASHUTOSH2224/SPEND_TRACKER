@@ -42,3 +42,8 @@ class UploadPresignRequest(BaseModel):
 class UploadPresignRead(BaseModel):
     upload_url: str
     file_storage_key: str
+
+
+class UploadStoreRead(BaseModel):
+    stored: bool
+    file_storage_key: str

@@ -7,6 +7,7 @@ from app.models.category import Category
 from app.models.reward_ledger import RewardLedger
 from app.models.statement import Statement
 from app.models.transaction import Transaction
+from app.services.charge_summaries import refresh_card_charge_summaries_for_periods
 from app.services.categories import slugify_category_name
 
 
@@ -471,6 +472,27 @@ def _seed_analytics_dataset(client) -> dict[str, object]:
         reward_value_estimate="500.00",
         notes="Other user earn",
     )
+
+    with get_session() as session:
+        refresh_card_charge_summaries_for_periods(
+            session,
+            user_id=UUID(owner_user_id),
+            card_id=UUID(owner_card_one_id),
+            period_months={date(2026, 2, 1), date(2026, 3, 1)},
+        )
+        refresh_card_charge_summaries_for_periods(
+            session,
+            user_id=UUID(owner_user_id),
+            card_id=UUID(owner_card_two_id),
+            period_months={date(2026, 2, 1), date(2026, 3, 1)},
+        )
+        refresh_card_charge_summaries_for_periods(
+            session,
+            user_id=UUID(other_user_id),
+            card_id=UUID(other_card_id),
+            period_months={date(2026, 3, 1)},
+        )
+        session.commit()
 
     return {
         "owner_headers": owner_headers,

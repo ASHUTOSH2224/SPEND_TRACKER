@@ -9,7 +9,9 @@ import type {
   CategoryRead,
   DashboardSummaryRead,
   MonthlyTrendRead,
+  RewardLedgerCreatePayload,
   RewardLedgerRead,
+  RewardLedgerUpdatePayload,
   RewardVsChargesRead,
   RuleCreatePayload,
   RuleRead,
@@ -20,6 +22,8 @@ import type {
   StatementRead,
   TopMerchantRead,
   TransactionRead,
+  TransactionBulkUpdatePayload,
+  TransactionBulkUpdateResult,
   TransactionUpdatePayload,
   UploadPresignRead,
   UserRead,
@@ -92,10 +96,18 @@ export function createApiClient(request: ApiRequester) {
         request<TransactionRead[]>("/transactions", { query }),
       update: (transactionId: string, body: TransactionUpdatePayload) =>
         request<TransactionRead>(`/transactions/${transactionId}`, { method: "PATCH", body }),
+      bulkUpdate: (body: TransactionBulkUpdatePayload) =>
+        request<TransactionBulkUpdateResult>("/transactions/bulk-update", { method: "POST", body }),
     },
     rewardLedgers: {
       list: (query?: ApiRequestOptions["query"]) =>
         request<RewardLedgerRead[]>("/reward-ledgers", { query }),
+      create: (body: RewardLedgerCreatePayload) =>
+        request<RewardLedgerRead>("/reward-ledgers", { method: "POST", body }),
+      update: (rewardLedgerId: string, body: RewardLedgerUpdatePayload) =>
+        request<RewardLedgerRead>(`/reward-ledgers/${rewardLedgerId}`, { method: "PATCH", body }),
+      remove: (rewardLedgerId: string) =>
+        request<RewardLedgerRead>(`/reward-ledgers/${rewardLedgerId}`, { method: "DELETE" }),
     },
   };
 }
