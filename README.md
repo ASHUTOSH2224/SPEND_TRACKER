@@ -19,10 +19,11 @@ This milestone implements backend foundation plus the first protected MVP entiti
 - transaction category audit logging for manual recategorization
 - reward ledger CRUD APIs for manual reward entries
 - card rewards and persisted charge summary endpoints
+- dashboard analytics and card performance endpoints backed by SQL aggregations
 - Docker compose support for backend plus PostgreSQL
 - pytest smoke coverage
 
-Statement ingestion, categorization, rewards, and analytics endpoints are still deferred.
+Statement ingestion and categorization are still deferred.
 This milestone only covers statement upload metadata and lifecycle state; it does not parse files yet.
 
 ## Repository layout
@@ -121,6 +122,18 @@ Reward endpoints:
 - `GET /api/v1/cards/{card_id}/rewards`
 - `GET /api/v1/cards/{card_id}/charges`
 
+Dashboard and card analytics endpoints:
+
+- `GET /api/v1/dashboard/summary`
+- `GET /api/v1/dashboard/spend-by-category`
+- `GET /api/v1/dashboard/spend-by-card`
+- `GET /api/v1/dashboard/rewards-vs-charges`
+- `GET /api/v1/dashboard/monthly-trend`
+- `GET /api/v1/dashboard/top-merchants`
+- `GET /api/v1/cards/{card_id}/summary`
+- `GET /api/v1/cards/{card_id}/monthly-trend`
+- `GET /api/v1/cards/{card_id}/transactions`
+
 Statement delete policy for the current MVP slice:
 
 - `DELETE /api/v1/statements/{statement_id}` is blocked if the statement already has linked transactions.
@@ -132,6 +145,15 @@ Charge summary source for the current MVP slice:
 - `GET /api/v1/cards/{card_id}/charges` reads persisted rows from `card_charge_summaries`.
 - The response exposes `source=card_charge_summaries` and `summary_period_count` so the provenance is explicit.
 - This endpoint does not derive charges live from transactions yet.
+
+Dashboard and card analytics assumptions for the current MVP slice:
+
+- Financial summaries exclude transactions where `duplicate_flag=true`.
+- Analytics charges are derived live from persisted `transactions` rows where `is_card_charge=true`.
+- `eligible_spend` is the sum of non-duplicate debit `txn_type=spend` transactions, so it currently matches `total_spend`.
+- `reward_value` uses `reward_ledgers.reward_value_estimate` when present; otherwise it falls back to `reward_points * card.reward_conversion_rate`.
+- Reward events are signed for analytics: `earned`, `cashback`, and positive `adjusted` rows add value; `redeemed` and `expired` rows reduce value.
+- `net_value` is computed as `reward_value - charges`.
 
 If you are using the Dockerized PostgreSQL service, start it first so the default `.env` database settings resolve:
 

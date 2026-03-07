@@ -1082,8 +1082,40 @@ Get overall dashboard summary.
 ### GET /dashboard/spend-by-category
 Returns category aggregation.
 
+#### Response
+```json
+{
+  "data": [
+    {
+      "category_id": "uuid",
+      "category_name": "Shopping",
+      "amount": 42000,
+      "transaction_count": 37
+    }
+  ],
+  "meta": {},
+  "error": null
+}
+```
+
 ### GET /dashboard/spend-by-card
 Returns card aggregation.
+
+#### Response
+```json
+{
+  "data": [
+    {
+      "card_id": "uuid",
+      "card_name": "HDFC Infinia",
+      "amount": 54000,
+      "transaction_count": 61
+    }
+  ],
+  "meta": {},
+  "error": null
+}
+```
 
 ### GET /dashboard/rewards-vs-charges
 Returns reward vs charges per card.
@@ -1109,8 +1141,48 @@ Returns reward vs charges per card.
 ### GET /dashboard/monthly-trend
 Returns monthly spend/reward/charge trend.
 
+#### Response
+```json
+{
+  "data": [
+    {
+      "month": "2026-03-01",
+      "total_spend": 124000,
+      "reward_value": 8400,
+      "charges": 3200,
+      "net_value": 5200
+    }
+  ],
+  "meta": {},
+  "error": null
+}
+```
+
 ### GET /dashboard/top-merchants
 Returns merchant aggregation.
+
+#### Response
+```json
+{
+  "data": [
+    {
+      "merchant_name": "Amazon",
+      "amount": 18000,
+      "transaction_count": 9
+    }
+  ],
+  "meta": {},
+  "error": null
+}
+```
+
+#### Analytics Assumptions
+- Dashboard financial summaries exclude `duplicate_flag=true` transactions.
+- Spend metrics use non-duplicate debit `txn_type=spend` transactions and exclude `is_card_charge=true`.
+- Analytics charges are derived from non-duplicate transactions where `is_card_charge=true`, not from `card_charge_summaries`.
+- `reward_value` uses `reward_ledgers.reward_value_estimate` when present; otherwise it falls back to `reward_points * card.reward_conversion_rate`.
+- Reward analytics treat `earned`, `cashback`, and positive `adjusted` rows as positive value, while `redeemed` and `expired` reduce value.
+- `category_id` filters apply to transaction-backed spend and charge slices. Reward ledgers are not category-scoped in MVP, so reward aggregations are filtered only by date/card scope.
 
 ---
 
@@ -1118,6 +1190,11 @@ Returns merchant aggregation.
 
 ### GET /cards/{card_id}/summary
 Get detailed card KPIs.
+
+#### Query Params
+- from_date
+- to_date
+- category_id
 
 #### Response
 ```json
@@ -1130,7 +1207,7 @@ Get detailed card KPIs.
       "issuer_name": "HDFC"
     },
     "total_spend": 54000,
-    "eligible_spend": 48000,
+    "eligible_spend": 54000,
     "reward_points": 8200,
     "reward_value": 4100,
     "charges": 1500,
@@ -1144,14 +1221,39 @@ Get detailed card KPIs.
 }
 ```
 
+#### Card Summary Assumptions
+- `eligible_spend` currently matches `total_spend` because MVP does not yet model issuer-specific reward eligibility rules.
+- `reward_points` is the signed reward-ledger balance for the filtered period.
+- `reward_value` follows the same signed reward-value rule as dashboard analytics.
+- `net_value = reward_value - charges`.
+
 ### GET /cards/{card_id}/transactions
 Card-scoped transactions.
+
+#### Query Params
+- category_id
+- statement_id
+- from_date
+- to_date
+- search
+- review_required
+- is_card_charge
+- charge_type
+- page
+- page_size
+- sort_by
+- sort_order
 
 ### GET /cards/{card_id}/charges
 Charge breakdown.
 
 ### GET /cards/{card_id}/monthly-trend
 Monthly trend for spend, rewards, charges.
+
+#### Query Params
+- from_date
+- to_date
+- category_id
 
 ---
 

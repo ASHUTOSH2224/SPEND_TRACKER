@@ -673,7 +673,7 @@ Add basic quality controls.
 ### H1. Dashboard aggregation query layer
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Tasks**
 
@@ -692,7 +692,7 @@ Add basic quality controls.
 ### H2. Dashboard endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -717,7 +717,7 @@ Add basic quality controls.
 ### H3. Card analytics endpoints
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Endpoints**
 
@@ -734,7 +734,7 @@ Add basic quality controls.
 ### H4. Dashboard analytics tests
 
 **Priority:** P0
-**Status:** Not Started
+**Status:** Done
 
 **Dependencies**
 
