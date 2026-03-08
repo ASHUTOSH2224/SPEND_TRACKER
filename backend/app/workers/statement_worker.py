@@ -4,7 +4,10 @@ import time
 
 from app.core.config import get_settings
 from app.db.session import get_session
-from app.services.statement_jobs import process_next_statement_processing_job
+from app.services.statement_jobs import (
+    enqueue_supported_zero_transaction_backfill_jobs,
+    process_next_statement_processing_job,
+)
 from app.services.storage import build_upload_storage
 
 LOGGER = logging.getLogger(__name__)
@@ -25,6 +28,14 @@ def run_once() -> bool:
             job.attempt_count,
         )
         return True
+
+
+def enqueue_parser_backfill_jobs() -> int:
+    with get_session() as session:
+        queued = enqueue_supported_zero_transaction_backfill_jobs(session)
+    if queued:
+        LOGGER.info("statement_worker_enqueued_parser_backfills count=%s", queued)
+    return queued
 
 
 def run_forever() -> None:
@@ -52,6 +63,7 @@ def main() -> None:
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
+    enqueue_parser_backfill_jobs()
     if args.once:
         run_once()
         return

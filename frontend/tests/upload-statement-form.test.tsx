@@ -108,6 +108,9 @@ describe("UploadStatementForm", () => {
     fireEvent.change(input as HTMLInputElement, {
       target: { files: [file] },
     });
+    fireEvent.change(screen.getByLabelText("PDF password"), {
+      target: { value: "statement-password" },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Upload statement" }));
 
@@ -131,6 +134,7 @@ describe("UploadStatementForm", () => {
         card_id: "card-1",
         file_name: "march_2026.pdf",
         file_storage_key: "statements/user-1/generated-march.pdf",
+        file_password: "statement-password",
         file_type: "pdf",
         statement_period_start: "2026-03-01",
         statement_period_end: "2026-03-31",
@@ -138,5 +142,52 @@ describe("UploadStatementForm", () => {
     });
     expect(await screen.findByText("Statement uploaded and queued successfully.")).toBeInTheDocument();
     expect(refreshMock).toHaveBeenCalled();
+  });
+
+  it("requires a PDF password before creating statement metadata", async () => {
+    render(
+      <UploadStatementForm
+        cards={[
+          {
+            id: "card-1",
+            nickname: "Primary Card",
+            issuer_name: "HDFC",
+            network: "Visa",
+            last4: "1234",
+            statement_cycle_day: 12,
+            annual_fee_expected: "12500.00",
+            joining_fee_expected: "12500.00",
+            reward_program_name: "Rewards",
+            reward_type: "points",
+            reward_conversion_rate: "0.5",
+            reward_rule_config_json: null,
+            status: "active",
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "card-1" },
+    });
+    fireEvent.change(screen.getByLabelText("Statement period start"), {
+      target: { value: "2026-03-01" },
+    });
+    fireEvent.change(screen.getByLabelText("Statement period end"), {
+      target: { value: "2026-03-31" },
+    });
+
+    const file = new File(["statement pdf body"], "march_2026.pdf", {
+      type: "application/pdf",
+    });
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [file] },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload statement" }));
+
+    expect(await screen.findByText("Enter the PDF password for this protected statement.")).toBeInTheDocument();
+    expect(presignMock).not.toHaveBeenCalled();
+    expect(createStatementMock).not.toHaveBeenCalled();
   });
 });

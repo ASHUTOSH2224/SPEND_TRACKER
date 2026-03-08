@@ -233,6 +233,7 @@ Upload statements and attach them to cards.
 | Card                [ Select Card v ]                                      |
 | Statement Period    [ 01-Feb-2026 ] to [ 28-Feb-2026 ]                    |
 | File                [ Choose File ]                                        |
+| PDF Password        [ **************** ]                                   |
 |                                                                            |
 | Drag & drop PDF / CSV here                                                 |
 |                                                                            |
@@ -452,6 +453,7 @@ Manage profile, privacy, import, and preferences.
 | card_id | uuid fk cards.id | |
 | file_name | varchar | |
 | file_storage_key | varchar | blob location |
+| file_password_encrypted | text | nullable, encrypted at rest for protected PDFs |
 | file_type | varchar | pdf/csv/xlsx |
 | statement_period_start | date | |
 | statement_period_end | date | |
@@ -509,7 +511,7 @@ Manage profile, privacy, import, and preferences.
 | amount | numeric(12,2) | positive stored with type |
 | currency | varchar(3) | default INR |
 | txn_direction | varchar | debit/credit |
-| txn_type | varchar | spend/refund/charge/reward/manual_adjustment |
+| txn_type | varchar | spend/refund/payment/charge/reward/manual_adjustment |
 | category_id | uuid fk categories.id | nullable pre-classification |
 | category_source | varchar | rule/history/llm/manual |
 | category_confidence | numeric(5,4) | 0-1 |
@@ -776,6 +778,7 @@ Recommended implementation:
   "card_id": "uuid",
   "file_name": "hdfc_feb_2026.pdf",
   "file_storage_key": "statements/user-1/hdfc_feb_2026.pdf",
+  "file_password": "statement-password",
   "file_type": "pdf",
   "statement_period_start": "2026-02-01",
   "statement_period_end": "2026-02-28"
@@ -798,8 +801,13 @@ Recommended implementation:
 
 Current scaffold behavior:
 - creating a statement enqueues a background processing job
-- the first real parser supports `HDFC + CSV` with the headers `Transaction Date`, `Post Date`, `Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`
-- unsupported files still fall back to the no-op parser, so successful runs can still complete with zero imported transactions
+- `file_password` is required when `file_type=pdf`; the backend stores it encrypted at rest and omits it from statement read/list responses
+- real parser coverage includes:
+  - `HDFC + CSV` with the headers `Transaction Date`, `Post Date`, `Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`
+  - `HDFC + PDF` statements whose text layer exposes `Domestic Transactions` rows like `DD/MM/YYYY| HH:MM ... C 1,234.56`
+- unsupported HDFC PDFs now fail extraction explicitly instead of completing with zero imported transactions
+- unsupported non-HDFC formats still fall back to the no-op parser
+- worker startup re-queues older `completed + 0 transaction` statements once with trigger source `parser_backfill` when the current codebase now has a real parser for that issuer/file type
 - statement status transitions are explicit: `uploaded/pending/pending -> processing/running/pending -> processing/completed/running -> completed/completed/completed`
 - extraction failures become `failed/failed/pending`
 - categorization failures become `failed/completed/failed`
@@ -1312,6 +1320,7 @@ Get pre-signed upload URL.
 ```
 
 For the local-development backend, `upload_url` is a relative `PUT` endpoint that writes the uploaded file to local disk before statement metadata is created.
+The PDF password is submitted separately to `POST /statements`, not to the upload `PUT`.
 
 ---
 

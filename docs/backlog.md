@@ -11,7 +11,7 @@ Core MVP scope:
 * authentication
 * cards management
 * statement upload metadata
-* transaction ingestion scaffolding and first narrow CSV parser
+* transaction ingestion scaffolding and first narrow HDFC CSV/PDF parsers
 * transactions explorer
 * categories and rules
 * rewards ledger

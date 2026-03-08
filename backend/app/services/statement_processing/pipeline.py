@@ -1,13 +1,15 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.secrets import open_secret
 from app.models.card import Card
 from app.models.statement import Statement
 from app.models.transaction import Transaction
+from app.models.transaction_category_audit import TransactionCategoryAudit
 from app.queries.statement_processing import source_hash_exists_for_user
 from app.services.charge_summaries import (
     charge_summary_periods_from_dates,
@@ -38,6 +40,7 @@ def process_statement(
     normalizer: StatementNormalizer | None = None,
     llm_provider: LLMCategoryProvider | None = None,
 ) -> Statement:
+    settings = get_settings()
     statement = session.get(Statement, statement_id)
     if statement is None:
         raise ValueError(f"Statement {statement_id} not found")
@@ -50,7 +53,7 @@ def process_statement(
         issuer_name=card.issuer_name,
     )
     normalizer_impl = normalizer or DefaultStatementNormalizer()
-    storage_impl = storage or build_upload_storage(get_settings())
+    storage_impl = storage or build_upload_storage(settings)
     categorizer = HybridTransactionCategorizer(
         session,
         llm_provider=llm_provider or get_llm_category_provider(),
@@ -61,6 +64,14 @@ def process_statement(
     charge_summary_periods = get_statement_charge_summary_periods(
         session,
         statement=statement,
+    )
+    statement_transaction_ids = (
+        select(Transaction.id).where(Transaction.statement_id == statement_id)
+    )
+    session.execute(
+        delete(TransactionCategoryAudit).where(
+            TransactionCategoryAudit.transaction_id.in_(statement_transaction_ids)
+        )
     )
     session.execute(
         delete(Transaction).where(Transaction.statement_id == statement_id)
@@ -84,6 +95,14 @@ def process_statement(
             file_name=statement.file_name,
             content_bytes=storage_impl.get_object_bytes(
                 file_storage_key=statement.file_storage_key
+            ),
+            password=(
+                open_secret(
+                    statement.file_password_encrypted,
+                    secret_key=settings.statement_secret_key,
+                )
+                if statement.file_password_encrypted is not None
+                else None
             ),
         )
         parsed_statement = parser_impl.parse(

@@ -19,7 +19,7 @@ class Transaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="ck_transactions_txn_direction_allowed",
         ),
         CheckConstraint(
-            "txn_type IN ('spend', 'refund', 'charge', 'reward', 'manual_adjustment')",
+            "txn_type IN ('spend', 'refund', 'payment', 'charge', 'reward', 'manual_adjustment')",
             name="ck_transactions_txn_type_allowed",
         ),
         CheckConstraint(

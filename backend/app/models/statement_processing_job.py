@@ -16,7 +16,7 @@ class StatementProcessingJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="ck_statement_processing_jobs_status_allowed",
         ),
         CheckConstraint(
-            "trigger_source IN ('create', 'retry')",
+            "trigger_source IN ('create', 'retry', 'parser_backfill')",
             name="ck_statement_processing_jobs_trigger_source_allowed",
         ),
         CheckConstraint(

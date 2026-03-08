@@ -12,8 +12,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       SQLALCHEMY_ECHO: ${SQLALCHEMY_ECHO:-false}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local_fake}
+      STORAGE_LOCAL_ROOT: /app/.local_storage
     volumes:
       - ../backend:/app/backend
+      - statement_storage:/app/.local_storage
     ports:
       - "8000:8000"
     depends_on:
@@ -33,11 +36,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       SQLALCHEMY_ECHO: ${SQLALCHEMY_ECHO:-false}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local_fake}
+      STORAGE_LOCAL_ROOT: /app/.local_storage
       WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-5}
       WORKER_BATCH_SIZE: ${WORKER_BATCH_SIZE:-10}
       LLM_PROVIDER_BACKEND: ${LLM_PROVIDER_BACKEND:-noop}
     volumes:
       - ../backend:/app/backend
+      - statement_storage:/app/.local_storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,3 +66,4 @@ services:
 
 volumes:
   postgres_data:
+  statement_storage:

@@ -129,6 +129,7 @@ export interface StatementCreatePayload {
   card_id: string;
   file_name: string;
   file_storage_key: string;
+  file_password?: string | null;
   file_type: "pdf" | "csv" | "xls" | "xlsx";
   statement_period_start: string;
   statement_period_end: string;

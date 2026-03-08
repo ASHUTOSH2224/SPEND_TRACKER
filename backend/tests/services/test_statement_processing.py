@@ -10,8 +10,13 @@ from app.models.card_charge_summary import CardChargeSummary
 from app.models.statement import Statement
 from app.models.statement_processing_job import StatementProcessingJob
 from app.models.transaction import Transaction
+from app.models.transaction_category_audit import TransactionCategoryAudit
 from app.services.storage import build_upload_storage
-from app.services.statement_jobs import process_next_statement_processing_job
+from app.services.statement_processing import parsers as parser_module
+from app.services.statement_jobs import (
+    enqueue_supported_zero_transaction_backfill_jobs,
+    process_next_statement_processing_job,
+)
 from app.services.statement_processing.pipeline import process_statement
 from app.services.statement_processing.types import ParsedStatementResult, ParsedTransactionRow
 
@@ -116,6 +121,7 @@ def _create_statement(
     file_type: str = "pdf",
     content_type: str = "application/pdf",
     file_bytes: bytes | None = None,
+    file_password: str | None = None,
 ) -> str:
     presign_response = client.post(
         "/api/v1/uploads/presign",
@@ -152,6 +158,11 @@ def _create_statement(
             "card_id": card_id,
             "file_name": file_name,
             "file_storage_key": file_storage_key,
+            **(
+                {"file_password": file_password if file_password is not None else "statement-password"}
+                if file_type == "pdf"
+                else {}
+            ),
             "file_type": file_type,
             "statement_period_start": "2026-03-01",
             "statement_period_end": "2026-03-31",
@@ -165,6 +176,30 @@ def _create_statement(
 def _hdfc_csv_bytes(*rows: str) -> bytes:
     header = "Transaction Date,Post Date,Description,Debit,Credit,Currency,Merchant\n"
     return (header + "\n".join(rows) + "\n").encode("utf-8")
+
+
+def _hdfc_pdf_pages() -> list[str]:
+    return [
+        "\n".join(
+            [
+                "Tata Neu Plus HDFC Bank Credit Card",
+                "Domestic Transactions",
+                "DATE & TIME TRANSACTION DESCRIPTION Base NeuCoins*AMOUNT PI",
+                "01/02/2026| 00:00IGST-VPS2603358587012-RATE 18.0 -23 (Ref# 09999999980201008742822) C 46.62 l",
+                "05/02/2026| 01:04 EMI FlipkartInternetPvtLBANGALORE + 299  C 29,850.00 l",
+                "17/02/2026| 03:14 BPPY CC PAYMENT DP016048031442x0GAm (Ref# ST260490083000010270039) +  C 19,326.00 l",
+                "19/02/2026| 21:29 UPI-OLIVE STREET FOODCAFE",
+                " C 256.00 l",
+                "Page 1 of 3",
+            ]
+        ),
+        "\n".join(
+            [
+                "Page 2 of 3",
+                "Summary continues here",
+            ]
+        ),
+    ]
 
 
 class ExplodingParser:
@@ -196,20 +231,28 @@ class SingleRowParser:
 class FileAwareNoOpParser:
     def __init__(self) -> None:
         self.seen_bytes: bytes | None = None
+        self.seen_password: str | None = None
 
     def parse(self, *, statement, statement_file) -> ParsedStatementResult:
         del statement
         self.seen_bytes = statement_file.content_bytes
+        self.seen_password = statement_file.password
         return ParsedStatementResult(parser_name="file-aware-noop", rows=[])
 
 
-def test_statement_create_enqueues_job_and_worker_completes_noop_processing(client) -> None:
+def test_unsupported_statement_format_completes_noop_processing(client) -> None:
     headers, _ = _auth_context(
         client,
         email="owner@example.com",
         full_name="Owner",
     )
-    card_id = _create_card(client, headers, last4="1234", nickname="HDFC Infinia")
+    card_id = _create_card(
+        client,
+        headers,
+        last4="1234",
+        nickname="Amex Platinum",
+        issuer_name="Amex",
+    )
     statement_id = _create_statement(
         client,
         headers,
@@ -241,6 +284,113 @@ def test_statement_create_enqueues_job_and_worker_completes_noop_processing(clie
         assert statement.categorization_status == "completed"
         assert statement.transaction_count == 0
         assert statement.processing_error is None
+
+
+def test_supported_zero_transaction_statements_are_backfilled_once_parser_exists(
+    client,
+    monkeypatch,
+) -> None:
+    headers, _ = _auth_context(
+        client,
+        email="backfill@example.com",
+        full_name="Backfill Case",
+    )
+    card_id = _create_card(client, headers, last4="1212", nickname="Backfill Card")
+    statement_id = _create_statement(
+        client,
+        headers,
+        card_id=card_id,
+        file_name="backfill_march_2026.pdf",
+    )
+
+    with get_session() as session:
+        first_job = process_next_statement_processing_job(
+            session,
+            parser=FileAwareNoOpParser(),
+        )
+        assert first_job is not None
+        assert first_job.status == "completed"
+
+    monkeypatch.setattr(
+        parser_module,
+        "_extract_pdf_page_texts",
+        lambda statement_file: _hdfc_pdf_pages(),
+    )
+
+    with get_session() as session:
+        enqueued_count = enqueue_supported_zero_transaction_backfill_jobs(session)
+        assert enqueued_count == 1
+
+        statement = session.get(Statement, UUID(statement_id))
+        assert statement is not None
+        assert statement.upload_status == "uploaded"
+        assert statement.extraction_status == "pending"
+        assert statement.categorization_status == "pending"
+        assert statement.transaction_count == 0
+
+        jobs = list(
+            session.scalars(
+                select(StatementProcessingJob)
+                .where(StatementProcessingJob.statement_id == UUID(statement_id))
+                .order_by(StatementProcessingJob.created_at.asc())
+            ).all()
+        )
+        assert len(jobs) == 2
+        assert jobs[0].trigger_source == "create"
+        assert jobs[0].status == "completed"
+        assert jobs[1].trigger_source == "parser_backfill"
+        assert jobs[1].status == "queued"
+
+    with get_session() as session:
+        backfilled_job = process_next_statement_processing_job(session)
+        assert backfilled_job is not None
+        assert backfilled_job.status == "completed"
+
+    with get_session() as session:
+        statement = session.get(Statement, UUID(statement_id))
+        assert statement is not None
+        assert statement.upload_status == "completed"
+        assert statement.transaction_count == 4
+
+
+def test_backfill_sweep_skips_formats_that_still_use_noop_parser(client) -> None:
+    headers, _ = _auth_context(
+        client,
+        email="noop-backfill@example.com",
+        full_name="Noop Backfill Case",
+    )
+    card_id = _create_card(
+        client,
+        headers,
+        last4="3434",
+        nickname="Unsupported Card",
+        issuer_name="Amex",
+    )
+    statement_id = _create_statement(
+        client,
+        headers,
+        card_id=card_id,
+        file_name="unsupported_backfill.pdf",
+    )
+
+    with get_session() as session:
+        first_job = process_next_statement_processing_job(session)
+        assert first_job is not None
+        assert first_job.status == "completed"
+
+    with get_session() as session:
+        enqueued_count = enqueue_supported_zero_transaction_backfill_jobs(session)
+        assert enqueued_count == 0
+
+        jobs = list(
+            session.scalars(
+                select(StatementProcessingJob)
+                .where(StatementProcessingJob.statement_id == UUID(statement_id))
+                .order_by(StatementProcessingJob.created_at.asc())
+            ).all()
+        )
+        assert len(jobs) == 1
+        assert jobs[0].trigger_source == "create"
 
 
 def test_statement_processing_failure_marks_statement_failed_and_retry_requeues_job(client) -> None:
@@ -375,6 +525,114 @@ def test_statement_processing_reads_uploaded_file_bytes(client) -> None:
         assert processed_job.status == "completed"
 
     assert parser.seen_bytes == b"statement-bytes-for-worker"
+    assert parser.seen_password == "statement-password"
+
+
+def test_hdfc_pdf_processing_imports_transactions_and_preserves_parser_metadata(
+    client,
+    monkeypatch,
+) -> None:
+    headers, _ = _auth_context(
+        client,
+        email="pdf@example.com",
+        full_name="PDF Case",
+    )
+    card_id = _create_card(client, headers, last4="4343", nickname="PDF Card")
+    category_id = _create_category(client, headers, name="Food & Dining")
+    _create_category(client, headers, name="Tax on Charge", group_name="charges")
+    _create_rule(
+        client,
+        headers,
+        category_id=category_id,
+        rule_name="Olive Street to Food",
+        match_value="OLIVE STREET",
+    )
+    statement_id = _create_statement(
+        client,
+        headers,
+        card_id=card_id,
+        file_name="march_2026.pdf",
+    )
+    monkeypatch.setattr(
+        parser_module,
+        "_extract_pdf_page_texts",
+        lambda statement_file: _hdfc_pdf_pages(),
+    )
+
+    with get_session() as session:
+        processed_job = process_next_statement_processing_job(session)
+        assert processed_job is not None
+        assert processed_job.status == "completed"
+
+    with get_session() as session:
+        statement = session.get(Statement, UUID(statement_id))
+        assert statement is not None
+        assert statement.upload_status == "completed"
+        assert statement.extraction_status == "completed"
+        assert statement.categorization_status == "completed"
+        assert statement.transaction_count == 4
+
+        transactions = list(
+            session.scalars(
+                select(Transaction)
+                .where(Transaction.statement_id == UUID(statement_id))
+                .order_by(Transaction.txn_date.asc(), Transaction.raw_description.asc())
+            ).all()
+        )
+        assert len(transactions) == 4
+
+        tax_txn = next(
+            transaction
+            for transaction in transactions
+            if transaction.raw_description.startswith("IGST-VPS2603358587012-RATE 18.0")
+        )
+        assert tax_txn.txn_type == "charge"
+        assert tax_txn.is_card_charge is True
+        assert tax_txn.charge_type == "tax"
+        assert tax_txn.category_source == "rule"
+        assert tax_txn.category_explanation == "Matched charge keyword for tax"
+        assert tax_txn.review_required is False
+        assert tax_txn.metadata_json == {
+            "parser_name": "hdfc_credit_card_pdf_v1",
+            "raw_metadata": {
+                "page_number": 1,
+                "entry_index": 1,
+                "raw_entry": (
+                    "01/02/2026| 00:00IGST-VPS2603358587012-RATE 18.0 -23 "
+                    "(Ref# 09999999980201008742822) C 46.62 l"
+                ),
+            },
+        }
+
+        emi_txn = next(
+            transaction
+            for transaction in transactions
+            if transaction.raw_description == "EMI FlipkartInternetPvtLBANGALORE"
+        )
+        assert emi_txn.txn_direction == "debit"
+        assert emi_txn.review_required is True
+
+        payment_txn = next(
+            transaction
+            for transaction in transactions
+            if "BPPY CC PAYMENT" in transaction.raw_description
+        )
+        assert payment_txn.txn_direction == "credit"
+        assert payment_txn.txn_type == "payment"
+        assert payment_txn.category_id is None
+        assert payment_txn.category_explanation == "Detected card bill repayment"
+        assert payment_txn.review_required is False
+        assert payment_txn.duplicate_flag is False
+
+        upi_txn = next(
+            transaction
+            for transaction in transactions
+            if transaction.raw_description == "UPI-OLIVE STREET FOODCAFE"
+        )
+        assert upi_txn.category_id == UUID(category_id)
+        assert upi_txn.category_source == "rule"
+        assert upi_txn.category_confidence == Decimal("0.9500")
+        assert upi_txn.review_required is False
 
 
 def test_hdfc_csv_processing_imports_transactions_and_preserves_parser_metadata(client) -> None:
@@ -578,6 +836,63 @@ def test_hdfc_csv_credit_rows_become_refunds_without_colliding_with_debits(clien
         assert debit_txn.source_hash != credit_txn.source_hash
 
 
+def test_hdfc_csv_credit_rows_distinguish_bill_repayments_from_refunds(client) -> None:
+    headers, _ = _auth_context(
+        client,
+        email="payments@example.com",
+        full_name="Payments Case",
+    )
+    card_id = _create_card(client, headers, last4="7878", nickname="Payment Card")
+    statement_id = _create_statement(
+        client,
+        headers,
+        card_id=card_id,
+        file_name="payments_2026.csv",
+        file_type="csv",
+        content_type="text/csv",
+        file_bytes=_hdfc_csv_bytes(
+            "12/03/2026,12/03/2026,BPPY CC PAYMENT REF123,,2500.00,INR,HDFC",
+            "13/03/2026,13/03/2026,MERCHANT REFUND REVERSAL,,540.00,INR,Merchant",
+        ),
+    )
+
+    with get_session() as session:
+        processed_job = process_next_statement_processing_job(session)
+        assert processed_job is not None
+        assert processed_job.status == "completed"
+
+    with get_session() as session:
+        transactions = list(
+            session.scalars(
+                select(Transaction)
+                .where(Transaction.statement_id == UUID(statement_id))
+                .order_by(Transaction.txn_date.asc(), Transaction.amount.desc())
+            ).all()
+        )
+        assert len(transactions) == 2
+
+        payment_txn = next(
+            transaction
+            for transaction in transactions
+            if "BPPY CC PAYMENT" in transaction.raw_description
+        )
+        refund_txn = next(
+            transaction
+            for transaction in transactions
+            if "MERCHANT REFUND REVERSAL" in transaction.raw_description
+        )
+
+        assert payment_txn.txn_direction == "credit"
+        assert payment_txn.txn_type == "payment"
+        assert payment_txn.category_id is None
+        assert payment_txn.review_required is False
+        assert payment_txn.category_explanation == "Detected card bill repayment"
+
+        assert refund_txn.txn_direction == "credit"
+        assert refund_txn.txn_type == "refund"
+        assert refund_txn.review_required is True
+
+
 def test_hdfc_csv_parser_failure_marks_statement_failed(client) -> None:
     headers, _ = _auth_context(
         client,
@@ -617,6 +932,55 @@ def test_hdfc_csv_parser_failure_marks_statement_failed(client) -> None:
         assert (
             statement.processing_error
             == "Unsupported HDFC CSV format: missing required columns posted_date"
+        )
+
+
+def test_hdfc_pdf_parser_failure_marks_statement_failed(client, monkeypatch) -> None:
+    headers, _ = _auth_context(
+        client,
+        email="badpdf@example.com",
+        full_name="Bad PDF Case",
+    )
+    card_id = _create_card(client, headers, last4="6767", nickname="Bad PDF Card")
+    statement_id = _create_statement(
+        client,
+        headers,
+        card_id=card_id,
+        file_name="bad_march_2026.pdf",
+    )
+    monkeypatch.setattr(
+        parser_module,
+        "_extract_pdf_page_texts",
+        lambda statement_file: [
+            "\n".join(
+                [
+                    "Tata Neu Plus HDFC Bank Credit Card",
+                    "Insta Loan Summary",
+                    "No domestic transaction table on this page",
+                ]
+            )
+        ],
+    )
+
+    with get_session() as session:
+        failed_job = process_next_statement_processing_job(session)
+        assert failed_job is not None
+        assert failed_job.status == "failed"
+        assert (
+            failed_job.last_error
+            == "Unsupported HDFC PDF format: no transaction rows found"
+        )
+
+    with get_session() as session:
+        statement = session.get(Statement, UUID(statement_id))
+        assert statement is not None
+        assert statement.upload_status == "failed"
+        assert statement.extraction_status == "failed"
+        assert statement.categorization_status == "pending"
+        assert statement.transaction_count == 0
+        assert (
+            statement.processing_error
+            == "Unsupported HDFC PDF format: no transaction rows found"
         )
 
 
@@ -735,3 +1099,64 @@ def test_statement_retry_rebuilds_and_clears_card_charge_summaries(client) -> No
         )
         assert len(transactions) == 1
         assert transactions[0].is_card_charge is False
+
+
+def test_statement_reprocessing_deletes_old_category_audits_before_reimport(client) -> None:
+    headers, _ = _auth_context(
+        client,
+        email="reprocess-audit@example.com",
+        full_name="Reprocess Audit Case",
+    )
+    card_id = _create_card(client, headers, last4="9090", nickname="Reprocess Card")
+    old_category_id = _create_category(client, headers, name="Old Category")
+    new_category_id = _create_category(client, headers, name="New Category")
+    statement_id = _create_statement(
+        client,
+        headers,
+        card_id=card_id,
+        file_name="reprocess_2026.csv",
+        file_type="csv",
+        content_type="text/csv",
+        file_bytes=_hdfc_csv_bytes(
+            "05/03/2026,06/03/2026,SWIGGY BANGALORE ORDER,540.00,,INR,Swiggy"
+        ),
+    )
+
+    with get_session() as session:
+        processed_job = process_next_statement_processing_job(session)
+        assert processed_job is not None
+        assert processed_job.status == "completed"
+
+    with get_session() as session:
+        transaction = session.scalar(
+            select(Transaction).where(Transaction.statement_id == UUID(statement_id))
+        )
+        assert transaction is not None
+        transaction.category_id = UUID(new_category_id)
+        session.add(
+            TransactionCategoryAudit(
+                transaction_id=transaction.id,
+                old_category_id=UUID(old_category_id),
+                new_category_id=UUID(new_category_id),
+                changed_by="user",
+                source="manual_patch",
+            )
+        )
+        session.commit()
+        original_transaction_id = transaction.id
+
+    with get_session() as session:
+        refreshed_statement = process_statement(session, statement_id=UUID(statement_id))
+        assert refreshed_statement.transaction_count == 1
+
+    with get_session() as session:
+        audit_count = session.query(TransactionCategoryAudit).count()
+        assert audit_count == 0
+
+        transactions = list(
+            session.scalars(
+                select(Transaction).where(Transaction.statement_id == UUID(statement_id))
+            ).all()
+        )
+        assert len(transactions) == 1
+        assert transactions[0].id != original_transaction_id

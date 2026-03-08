@@ -60,6 +60,7 @@ class Statement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    file_password_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_type: Mapped[str] = mapped_column(String(16), nullable=False)
     statement_period_start: Mapped[date] = mapped_column(Date, nullable=False)
     statement_period_end: Mapped[date] = mapped_column(Date, nullable=False)

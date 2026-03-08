@@ -30,6 +30,7 @@ class StatementFilePayload:
     file_storage_key: str
     file_name: str
     content_bytes: bytes
+    password: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

@@ -146,6 +146,15 @@ class HybridTransactionCategorizer(TransactionCategorizer):
         user_id: UUID,
         normalized_row: NormalizedTransactionRow,
     ) -> CategorizationDecision:
+        if normalized_row.txn_type == "payment":
+            return CategorizationDecision(
+                category_id=None,
+                category_source=None,
+                category_confidence=None,
+                category_explanation="Detected card bill repayment",
+                review_required=False,
+            )
+
         deterministic_decision = self._deterministic.categorize(
             user_id=user_id,
             normalized_row=normalized_row,

@@ -27,10 +27,14 @@ This milestone implements backend foundation plus the first protected MVP entiti
 
 The async scaffold now queues statement-processing jobs and persists explicit
 status transitions. Bank-specific parsing and real LLM categorization are still
-deferred beyond the first narrow importer. The current worker supports one real
-issuer format, `HDFC + CSV`, using the columns `Transaction Date`, `Post Date`,
-`Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`. Other
-formats still fall back to the no-op parser. The worker also uses a default
+deferred beyond the first narrow importer. The current worker supports two real
+HDFC formats:
+- `HDFC + CSV`, using the columns `Transaction Date`, `Post Date`, `Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`
+- `HDFC + PDF` statements whose text layer exposes `Domestic Transactions` rows like `DD/MM/YYYY| HH:MM ... C 1,234.56`
+
+Other issuers and file formats still fall back to the no-op parser. Unsupported
+HDFC PDFs now fail extraction explicitly instead of completing with zero imported
+transactions. The worker also uses a default
 normalizer, a deterministic categorization scaffold, a merchant-history hook,
 and a no-op LLM provider stub.
 
@@ -69,11 +73,13 @@ utils/
 1. Create a local environment file from the template.
 2. Set either `DATABASE_URL` directly or the individual `POSTGRES_*` variables.
 3. Set `AUTH_SECRET_KEY` for JWT signing. The checked-in default is for local development only.
-4. Set `STORAGE_BACKEND=local_fake` unless you are wiring a different storage adapter.
-5. `STORAGE_LOCAL_ROOT` controls where local-development statement files are written. The default is `.local_storage/` at the repo root.
-6. Worker defaults are `WORKER_POLL_INTERVAL_SECONDS=5`, `WORKER_BATCH_SIZE=10`, and `LLM_PROVIDER_BACKEND=noop`.
-7. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
-8. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
+4. Set `STATEMENT_SECRET_KEY` for encrypting PDF passwords at rest. If unset, the backend falls back to `AUTH_SECRET_KEY` in local development.
+5. Set `STORAGE_BACKEND=local_fake` unless you are wiring a different storage adapter.
+6. `STORAGE_LOCAL_ROOT` controls where local-development statement files are written. Relative values are resolved from the repo root so the API server and worker use the same folder even if they start from different directories. The default is `.local_storage/` at the repo root.
+7. Worker defaults are `WORKER_POLL_INTERVAL_SECONDS=5`, `WORKER_BATCH_SIZE=10`, and `LLM_PROVIDER_BACKEND=noop`.
+8. The default template uses `localhost:5433` so the Dockerized PostgreSQL service does not collide with an existing local PostgreSQL server on `5432`.
+9. Docker Compose overrides the backend container to use the internal database host `postgres:5432`.
+10. In Docker, the `api` and `worker` services must share the same statement storage volume. The checked-in Compose file now mounts a shared `statement_storage` volume at `/app/.local_storage` for both services.
 
 Example:
 
@@ -129,13 +135,18 @@ Statement processing scaffold behavior:
 
 - `POST /api/v1/statements` and `POST /api/v1/statements/{statement_id}/retry` enqueue a `statement_processing_jobs` row.
 - `POST /api/v1/uploads/presign` returns a local-development `upload_url` that accepts a `PUT` to write the statement file under `STORAGE_LOCAL_ROOT`.
+- `POST /api/v1/statements` requires `file_password` for `file_type=pdf`. The password is stored encrypted at rest and is not returned by statement read/list responses.
 - The worker updates statement statuses through `uploaded/pending/pending -> processing/running/pending -> processing/completed/running -> completed/completed/completed` on success.
 - Extraction failures mark statements `failed/failed/pending`.
 - Categorization failures mark statements `failed/completed/failed`.
-- The first real parser supports `HDFC + CSV` with headers `Transaction Date`, `Post Date`, `Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`.
-- Imported CSV rows preserve raw parser metadata under each transaction's `metadata_json.raw_metadata`.
-- Unsupported formats still fall back to the no-op parser.
-- The worker now reads the stored statement file by `file_storage_key` before invoking the parser.
+- Real parser coverage now includes:
+  - `HDFC + CSV` with headers `Transaction Date`, `Post Date`, `Description`, `Debit`, `Credit`, `Currency`, and optional `Merchant`
+  - `HDFC + PDF` statements whose text layer exposes `Domestic Transactions` rows like `DD/MM/YYYY| HH:MM ... C 1,234.56`
+- Imported rows preserve raw parser metadata under each transaction's `metadata_json.raw_metadata`.
+- Credit bill repayments such as `CC PAYMENT`, `BILL PAYMENT`, `BILLDESK`, `NEFT`, or `IMPS` are stored as `txn_type=payment`, while cancelled or reversed merchant credits remain `txn_type=refund`.
+- Unsupported HDFC PDFs fail extraction explicitly, while unsupported other formats still fall back to the no-op parser.
+- On worker startup, older `completed + 0 transaction` statements are re-queued once with trigger source `parser_backfill` when a real parser now exists for that issuer/file-type combination.
+- The worker now reads the stored statement file by `file_storage_key` before invoking the parser, and passes the decrypted PDF password to issuer-specific parsers when present.
 
 Transaction endpoints:
 

@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.secrets import seal_secret
 from app.core.exceptions import AppException
 from app.models.card import Card
 from app.models.statement import Statement
@@ -26,6 +27,7 @@ def create_statement_for_user(
     user_id: UUID,
     payload: StatementCreate,
     storage: UploadStorage,
+    statement_secret_key: str,
 ) -> Statement:
     card = _get_card_for_statement_create(session, user_id=user_id, card_id=payload.card_id)
     if not storage.is_owned_key(
@@ -43,6 +45,11 @@ def create_statement_for_user(
         card_id=card.id,
         file_name=payload.file_name,
         file_storage_key=payload.file_storage_key,
+        file_password_encrypted=(
+            seal_secret(payload.file_password, secret_key=statement_secret_key)
+            if payload.file_password is not None
+            else None
+        ),
         file_type=payload.file_type,
         statement_period_start=payload.statement_period_start,
         statement_period_end=payload.statement_period_end,

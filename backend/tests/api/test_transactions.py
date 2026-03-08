@@ -85,6 +85,7 @@ def _create_statement(
     file_name: str,
     statement_period_start: str,
     statement_period_end: str,
+    file_password: str = "statement-password",
 ) -> str:
     presign_response = client.post(
         "/api/v1/uploads/presign",
@@ -103,6 +104,7 @@ def _create_statement(
             "card_id": card_id,
             "file_name": file_name,
             "file_storage_key": file_storage_key,
+            "file_password": file_password,
             "file_type": "pdf",
             "statement_period_start": statement_period_start,
             "statement_period_end": statement_period_end,

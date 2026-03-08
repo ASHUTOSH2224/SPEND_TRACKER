@@ -37,3 +37,18 @@ def test_local_storage_retrieves_and_deletes_uploaded_files(
     assert storage.delete_object(file_storage_key=target.file_storage_key) is False
 
     clear_settings_cache()
+
+
+def test_relative_storage_root_resolves_from_repo_root(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("STORAGE_LOCAL_ROOT", ".local_storage")
+    clear_settings_cache()
+
+    settings = get_settings()
+
+    assert settings.storage_local_root.is_absolute()
+    assert settings.storage_local_root.name == ".local_storage"
+    assert settings.storage_local_root.parent == settings.storage_local_root.parent.parent / "spend_tracker"
+
+    clear_settings_cache()

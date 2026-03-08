@@ -1,14 +1,18 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.models.card import Card
+from app.models.statement import Statement
 from app.models.statement_processing_job import StatementProcessingJob
 from app.queries.statement_jobs import (
     get_active_statement_processing_job,
+    has_statement_processing_job_with_trigger_source,
     get_next_queued_statement_processing_job,
 )
+from app.services.statement_processing.parsers import NoOpStatementParser, select_statement_parser
 from app.services.statement_processing.pipeline import process_statement
 from app.services.statement_processing.types import (
     LLMCategoryProvider,
@@ -44,6 +48,62 @@ def enqueue_statement_processing_job(
     session.commit()
     session.refresh(job)
     return job
+
+
+def enqueue_supported_zero_transaction_backfill_jobs(session: Session) -> int:
+    candidate_rows = session.execute(
+        select(Statement, Card)
+        .join(Card, Card.id == Statement.card_id)
+        .where(
+            Statement.upload_status == "completed",
+            Statement.extraction_status == "completed",
+            Statement.categorization_status == "completed",
+            Statement.transaction_count == 0,
+            Statement.processing_error.is_(None),
+        )
+        .order_by(Statement.created_at.asc())
+    ).all()
+
+    enqueued_count = 0
+    for statement, card in candidate_rows:
+        if get_active_statement_processing_job(session, statement_id=statement.id) is not None:
+            continue
+        if has_statement_processing_job_with_trigger_source(
+            session,
+            statement_id=statement.id,
+            trigger_source="parser_backfill",
+        ):
+            continue
+
+        parser = select_statement_parser(
+            statement=statement,
+            issuer_name=card.issuer_name,
+        )
+        if isinstance(parser, NoOpStatementParser):
+            continue
+
+        statement.upload_status = "uploaded"
+        statement.extraction_status = "pending"
+        statement.categorization_status = "pending"
+        statement.transaction_count = 0
+        statement.processing_error = None
+
+        session.add(
+            StatementProcessingJob(
+                statement_id=statement.id,
+                trigger_source="parser_backfill",
+                status="queued",
+                attempt_count=0,
+                last_error=None,
+                started_at=None,
+                finished_at=None,
+            )
+        )
+        enqueued_count += 1
+
+    if enqueued_count:
+        session.commit()
+    return enqueued_count
 
 
 def claim_next_statement_processing_job(session: Session) -> StatementProcessingJob | None:

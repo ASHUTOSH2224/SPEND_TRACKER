@@ -1,7 +1,8 @@
 import csv
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from io import StringIO
+from io import BytesIO, StringIO
+import re
 
 from app.models.statement import Statement
 from app.services.statement_processing.types import (
@@ -21,14 +22,32 @@ _HEADER_ALIASES = {
     "merchant": ("merchant", "merchant name"),
 }
 
+_PDF_TRANSACTION_START_PATTERN = re.compile(
+    r"^(?P<txn_date>\d{2}/\d{2}/\d{4})\|\s*(?P<txn_time>\d{2}:\d{2})(?P<body>.*)$"
+)
+_PDF_AMOUNT_PATTERN = re.compile(r"\bC\s+(?P<amount>\d[\d,]*\.\d{2})\b")
+_PDF_WHITESPACE_PATTERN = re.compile(r"\s+")
+_PDF_TRAILING_MARKER_PATTERN = re.compile(r"(?:\s+[+-]\s*\d+\s*[+-]?|\s+[+-])+$")
+_PDF_CREDIT_KEYWORDS = (
+    " payment ",
+    " refund",
+    " refund ",
+    "reversal",
+    "reversed",
+    "chargeback",
+)
+
 
 def select_statement_parser(
     *,
     statement: Statement,
     issuer_name: str,
 ) -> StatementParser:
-    if statement.file_type == "csv" and issuer_name.strip().casefold() == "hdfc":
+    normalized_issuer = issuer_name.strip().casefold()
+    if statement.file_type == "csv" and normalized_issuer == "hdfc":
         return HDFCCreditCardCsvStatementParser()
+    if statement.file_type == "pdf" and normalized_issuer == "hdfc":
+        return HDFCCreditCardPdfStatementParser()
     return NoOpStatementParser()
 
 
@@ -98,6 +117,41 @@ class HDFCCreditCardCsvStatementParser(StatementParser):
                     },
                 )
             )
+
+        return ParsedStatementResult(
+            parser_name=self.parser_name,
+            rows=rows,
+        )
+
+
+class HDFCCreditCardPdfStatementParser(StatementParser):
+    parser_name = "hdfc_credit_card_pdf_v1"
+
+    def parse(
+        self,
+        *,
+        statement: Statement,
+        statement_file: StatementFilePayload,
+    ) -> ParsedStatementResult:
+        del statement
+
+        rows: list[ParsedTransactionRow] = []
+        for page_number, page_text in enumerate(
+            _extract_pdf_page_texts(statement_file),
+            start=1,
+        ):
+            entries = _collect_hdfc_pdf_entries(page_text)
+            for entry_index, entry_text in enumerate(entries, start=1):
+                rows.append(
+                    _parse_hdfc_pdf_entry(
+                        entry_text=entry_text,
+                        page_number=page_number,
+                        entry_index=entry_index,
+                    )
+                )
+
+        if not rows:
+            raise ValueError("Unsupported HDFC PDF format: no transaction rows found")
 
         return ParsedStatementResult(
             parser_name=self.parser_name,
@@ -223,3 +277,105 @@ def _resolve_direction_and_amount(
 
 def _is_empty_csv_row(row: dict[str, str | None]) -> bool:
     return all(value is None or not value.strip() for value in row.values())
+
+
+def _extract_pdf_page_texts(statement_file: StatementFilePayload) -> list[str]:
+    try:
+        from PyPDF2 import PdfReader
+    except ImportError as exc:
+        raise RuntimeError(
+            "PyPDF2 is required for HDFC PDF statement parsing"
+        ) from exc
+
+    reader = PdfReader(BytesIO(statement_file.content_bytes))
+    if reader.is_encrypted:
+        if not statement_file.password:
+            raise ValueError("PDF password is required")
+        if not reader.decrypt(statement_file.password):
+            raise ValueError("Incorrect PDF password")
+
+    return [(page.extract_text() or "") for page in reader.pages]
+
+
+def _collect_hdfc_pdf_entries(page_text: str) -> list[str]:
+    entries: list[str] = []
+    current_lines: list[str] = []
+
+    for raw_line in page_text.splitlines():
+        line = _collapse_pdf_whitespace(raw_line)
+        if not line:
+            continue
+        if _PDF_TRANSACTION_START_PATTERN.match(line):
+            if current_lines:
+                entries.append(" ".join(current_lines))
+            current_lines = [line]
+            continue
+        if current_lines:
+            current_lines.append(line)
+
+    if current_lines:
+        entries.append(" ".join(current_lines))
+    return entries
+
+
+def _parse_hdfc_pdf_entry(
+    *,
+    entry_text: str,
+    page_number: int,
+    entry_index: int,
+) -> ParsedTransactionRow:
+    start_match = _PDF_TRANSACTION_START_PATTERN.match(entry_text)
+    if start_match is None:
+        raise ValueError(
+            "Unsupported HDFC PDF format: transaction row is missing the date/time prefix"
+        )
+
+    amount_match = _PDF_AMOUNT_PATTERN.search(start_match.group("body"))
+    if amount_match is None:
+        raise ValueError("Unsupported HDFC PDF format: transaction row is missing amount")
+
+    raw_description = _cleanup_hdfc_pdf_description(
+        start_match.group("body")[: amount_match.start()]
+    )
+    if not raw_description:
+        raise ValueError(
+            "Unsupported HDFC PDF format: transaction row is missing description"
+        )
+
+    amount = _parse_optional_amount(amount_match.group("amount"))
+    assert amount is not None
+
+    return ParsedTransactionRow(
+        txn_date=_parse_date(start_match.group("txn_date")),
+        posted_date=None,
+        description=raw_description,
+        merchant=None,
+        amount=amount,
+        currency="INR",
+        txn_direction=_infer_hdfc_pdf_direction(raw_description),
+        metadata={
+            "page_number": page_number,
+            "entry_index": entry_index,
+            "raw_entry": entry_text,
+        },
+    )
+
+
+def _collapse_pdf_whitespace(value: str) -> str:
+    return _PDF_WHITESPACE_PATTERN.sub(" ", value.strip())
+
+
+def _cleanup_hdfc_pdf_description(value: str) -> str:
+    cleaned = _collapse_pdf_whitespace(value)
+    while True:
+        updated = _PDF_TRAILING_MARKER_PATTERN.sub("", cleaned).strip()
+        if updated == cleaned:
+            return updated
+        cleaned = updated
+
+
+def _infer_hdfc_pdf_direction(description: str) -> str:
+    lowered = f" {description.lower()} "
+    if any(keyword in lowered for keyword in _PDF_CREDIT_KEYWORDS):
+        return "credit"
+    return "debit"

@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db_session, get_upload_storage
+from app.core.config import Settings, get_settings
 from app.models.user import User
 from app.schemas.common import ResponseEnvelope, success_response
 from app.schemas.statements import (
@@ -60,12 +61,14 @@ def create_statement(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
     storage: UploadStorage = Depends(get_upload_storage),
+    settings: Settings = Depends(get_settings),
 ) -> ResponseEnvelope[StatementRead]:
     statement = create_statement_for_user(
         session,
         user_id=current_user.id,
         payload=payload,
         storage=storage,
+        statement_secret_key=settings.statement_secret_key,
     )
     return success_response(_serialize_statement(statement))
 

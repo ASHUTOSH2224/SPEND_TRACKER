@@ -48,6 +48,7 @@ class Settings:
     database_url: str
     sqlalchemy_echo: bool
     auth_secret_key: str
+    statement_secret_key: str
     auth_jwt_algorithm: str
     auth_access_token_expire_minutes: int
     auth_password_hash_iterations: int
@@ -78,6 +79,12 @@ def get_settings() -> Settings:
             database=postgres_db,
         ).render_as_string(hide_password=False)
 
+    storage_local_root = Path(
+        os.getenv("STORAGE_LOCAL_ROOT", str(REPO_ROOT / ".local_storage"))
+    ).expanduser()
+    if not storage_local_root.is_absolute():
+        storage_local_root = (REPO_ROOT / storage_local_root).resolve()
+
     return Settings(
         app_name=os.getenv("APP_NAME", "Spend Tracker API"),
         app_env=app_env,
@@ -95,6 +102,10 @@ def get_settings() -> Settings:
             "AUTH_SECRET_KEY",
             "local-dev-secret-key-change-me",
         ),
+        statement_secret_key=os.getenv(
+            "STATEMENT_SECRET_KEY",
+            os.getenv("AUTH_SECRET_KEY", "local-dev-secret-key-change-me"),
+        ),
         auth_jwt_algorithm=os.getenv("AUTH_JWT_ALGORITHM", "HS256"),
         auth_access_token_expire_minutes=int(
             os.getenv("AUTH_ACCESS_TOKEN_EXPIRE_MINUTES", "60")
@@ -103,9 +114,7 @@ def get_settings() -> Settings:
             os.getenv("AUTH_PASSWORD_HASH_ITERATIONS", "600000")
         ),
         storage_backend=os.getenv("STORAGE_BACKEND", "local_fake").strip().lower(),
-        storage_local_root=Path(
-            os.getenv("STORAGE_LOCAL_ROOT", str(REPO_ROOT / ".local_storage"))
-        ).expanduser(),
+        storage_local_root=storage_local_root,
         worker_poll_interval_seconds=int(
             os.getenv("WORKER_POLL_INTERVAL_SECONDS", "5")
         ),

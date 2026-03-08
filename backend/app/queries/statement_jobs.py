@@ -36,3 +36,20 @@ def get_next_queued_statement_processing_job(
         .limit(1)
     )
     return session.scalar(statement)
+
+
+def has_statement_processing_job_with_trigger_source(
+    session: Session,
+    *,
+    statement_id: UUID,
+    trigger_source: str,
+) -> bool:
+    statement = (
+        select(StatementProcessingJob.id)
+        .where(
+            StatementProcessingJob.statement_id == statement_id,
+            StatementProcessingJob.trigger_source == trigger_source,
+        )
+        .limit(1)
+    )
+    return session.scalar(statement) is not None

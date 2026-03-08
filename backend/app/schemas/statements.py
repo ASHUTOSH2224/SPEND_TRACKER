@@ -49,6 +49,7 @@ class StatementCreate(BaseModel):
     card_id: UUID
     file_name: Annotated[str, Field(min_length=1, max_length=255)]
     file_storage_key: Annotated[str, Field(min_length=1, max_length=1024)]
+    file_password: Annotated[str | None, Field(default=None, max_length=256)] = None
     file_type: StatementFileType
     statement_period_start: date
     statement_period_end: date
@@ -66,6 +67,15 @@ class StatementCreate(BaseModel):
             raise ValueError("file_storage_key contains unsupported characters")
         return normalized
 
+    @field_validator("file_password", mode="before")
+    @classmethod
+    def normalize_file_password(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("file_password must be a string")
+        return value if value != "" else None
+
     @field_validator("file_type", mode="before")
     @classmethod
     def normalize_file_type(cls, value: str) -> str:
@@ -73,6 +83,8 @@ class StatementCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_period(self) -> "StatementCreate":
+        if self.file_type == "pdf" and self.file_password is None:
+            raise ValueError("file_password is required for pdf statements")
         if self.statement_period_end < self.statement_period_start:
             raise ValueError("statement_period_end must be on or after statement_period_start")
         return self

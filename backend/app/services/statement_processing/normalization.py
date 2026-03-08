@@ -24,6 +24,29 @@ _CHARGE_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("tax", ("gst", "tax on charge")),
 )
 
+_REFUND_KEYWORDS: tuple[str, ...] = (
+    "refund",
+    "reversal",
+    "reversed",
+    "chargeback",
+    "return",
+    "returned",
+    "cancelled",
+    "cancellation",
+)
+
+_PAYMENT_KEYWORDS: tuple[str, ...] = (
+    "cc payment",
+    "card payment",
+    "bill payment",
+    "payment received",
+    "autopay",
+    "billdesk",
+    "bppy",
+    "neft",
+    "imps",
+)
+
 
 def _collapse_whitespace(value: str) -> str:
     return _WHITESPACE_PATTERN.sub(" ", value.strip())
@@ -42,6 +65,15 @@ def _detect_charge_type(description: str) -> str | None:
         if any(keyword in lowered for keyword in keywords):
             return charge_type
     return None
+
+
+def _detect_credit_txn_type(description: str) -> str:
+    lowered = description.lower()
+    if any(keyword in lowered for keyword in _REFUND_KEYWORDS):
+        return "refund"
+    if any(keyword in lowered for keyword in _PAYMENT_KEYWORDS):
+        return "payment"
+    return "refund"
 
 
 def _build_source_hash(
@@ -83,7 +115,7 @@ class DefaultStatementNormalizer(StatementNormalizer):
 
             txn_type = "spend"
             if row.txn_direction == "credit":
-                txn_type = "refund"
+                txn_type = _detect_credit_txn_type(description)
             elif is_card_charge:
                 txn_type = "charge"
 

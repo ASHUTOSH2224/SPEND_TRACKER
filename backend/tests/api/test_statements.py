@@ -1,6 +1,9 @@
 from datetime import date
 from uuid import UUID
 
+from app.core.config import get_settings
+from app.core.secrets import open_secret
+
 
 def _auth_headers(client, *, email: str, full_name: str) -> dict[str, str]:
     response = client.post(
@@ -60,6 +63,7 @@ def _create_statement(
     file_storage_key: str,
     period_start: str,
     period_end: str,
+    file_password: str = "statement-password",
 ) -> dict:
     response = client.post(
         "/api/v1/statements",
@@ -67,6 +71,7 @@ def _create_statement(
             "card_id": card_id,
             "file_name": file_name,
             "file_storage_key": file_storage_key,
+            "file_password": file_password,
             "file_type": "pdf",
             "statement_period_start": period_start,
             "statement_period_end": period_end,
@@ -118,6 +123,7 @@ def test_statement_create_list_detail_retry_delete_flow(client) -> None:
     assert statement_one["extraction_status"] == "pending"
     assert statement_one["categorization_status"] == "pending"
     assert statement_one["transaction_count"] == 0
+    assert "file_password" not in statement_one
 
     detail_response = client.get(f"/api/v1/statements/{statement_one['id']}", headers=headers)
     assert detail_response.status_code == 200
@@ -176,6 +182,16 @@ def test_statement_create_list_detail_retry_delete_flow(client) -> None:
         statement_record.processing_error = "Parser timed out"
         session.commit()
 
+    with get_session() as session:
+        statement_record = session.get(Statement, UUID(statement_one["id"]))
+        assert statement_record is not None
+        assert statement_record.file_password_encrypted is not None
+        assert statement_record.file_password_encrypted != "statement-password"
+        assert open_secret(
+            statement_record.file_password_encrypted,
+            secret_key=get_settings().statement_secret_key,
+        ) == "statement-password"
+
     retry_response = client.post(
         f"/api/v1/statements/{statement_two['id']}/retry",
         headers=headers,
@@ -232,6 +248,7 @@ def test_statement_routes_enforce_owned_cards_and_statement_ownership(client) ->
             "card_id": other_card_id,
             "file_name": "bad.pdf",
             "file_storage_key": presigned_owner["file_storage_key"],
+            "file_password": "statement-password",
             "file_type": "pdf",
             "statement_period_start": "2026-02-01",
             "statement_period_end": "2026-02-28",
@@ -247,6 +264,7 @@ def test_statement_routes_enforce_owned_cards_and_statement_ownership(client) ->
             "card_id": owner_card_id,
             "file_name": "bad.pdf",
             "file_storage_key": presigned_other["file_storage_key"],
+            "file_password": "statement-password",
             "file_type": "pdf",
             "statement_period_start": "2026-02-01",
             "statement_period_end": "2026-02-28",
@@ -329,6 +347,7 @@ def test_statement_create_rejects_archived_cards(client) -> None:
             "card_id": card_id,
             "file_name": "owner_statement.pdf",
             "file_storage_key": presigned["file_storage_key"],
+            "file_password": "statement-password",
             "file_type": "pdf",
             "statement_period_start": date(2026, 2, 1).isoformat(),
             "statement_period_end": date(2026, 2, 28).isoformat(),
@@ -337,3 +356,25 @@ def test_statement_create_rejects_archived_cards(client) -> None:
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "CARD_ARCHIVED"
+
+
+def test_statement_create_requires_pdf_password(client) -> None:
+    headers = _auth_headers(client, email="missing-password@example.com", full_name="Missing Password")
+    card_id = _create_card(client, headers, last4="1234", nickname="Protected Card")
+    presigned = _presign_upload(client, headers, file_name="protected_statement.pdf")
+
+    response = client.post(
+        "/api/v1/statements",
+        json={
+            "card_id": card_id,
+            "file_name": "protected_statement.pdf",
+            "file_storage_key": presigned["file_storage_key"],
+            "file_type": "pdf",
+            "statement_period_start": "2026-03-01",
+            "statement_period_end": "2026-03-31",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"

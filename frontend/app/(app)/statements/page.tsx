@@ -101,7 +101,7 @@ export default async function StatementsPage({
                         </td>
                         <td className="px-4 py-4 align-top">{statement.transaction_count}</td>
                         <td className="px-4 py-4 align-top">
-                          <StatementActions statementId={statement.id} />
+                          <StatementActions statementId={statement.id} uploadStatus={statement.upload_status} />
                         </td>
                       </tr>
                     );

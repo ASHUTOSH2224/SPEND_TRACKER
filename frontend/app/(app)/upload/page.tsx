@@ -1,3 +1,4 @@
+import { StatementActions } from "@/components/forms/statement-actions";
 import { UploadStatementForm } from "@/components/forms/upload-statement-form";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusPill } from "@/components/shared/status-pill";
@@ -49,8 +50,16 @@ export default async function UploadPage() {
                     <p className="mt-1 text-sm text-muted">
                       {statement.file_name} • {formatDate(statement.statement_period_start)} to {formatDate(statement.statement_period_end)}
                     </p>
+                    {statement.processing_error ? (
+                      <p className="mt-2 text-xs text-danger">{statement.processing_error}</p>
+                    ) : null}
                   </div>
-                  <StatusPill status={statement.upload_status} />
+                  <div className="flex flex-col items-start gap-2 md:items-end">
+                    <StatusPill status={statement.upload_status} />
+                    {statement.upload_status === "failed" ? (
+                      <StatementActions statementId={statement.id} uploadStatus={statement.upload_status} />
+                    ) : null}
+                  </div>
                 </div>
               );
             })}

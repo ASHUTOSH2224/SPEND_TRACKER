@@ -14,10 +14,13 @@ export function UploadStatementForm({ cards }: { cards: CardRead[] }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const requiresPdfPassword =
+    selectedFile !== null && inferStatementFileType(selectedFile.name) === "pdf";
 
   return (
     <form
       className="grid gap-4"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         const form = event.currentTarget;
@@ -25,9 +28,14 @@ export function UploadStatementForm({ cards }: { cards: CardRead[] }) {
         const cardId = String(formData.get("card_id") || "");
         const statementPeriodStart = String(formData.get("statement_period_start") || "");
         const statementPeriodEnd = String(formData.get("statement_period_end") || "");
+        const filePassword = String(formData.get("file_password") || "");
 
         if (!selectedFile || !cardId || !statementPeriodStart || !statementPeriodEnd) {
           setMessage("Select a card, a file, and a statement period.");
+          return;
+        }
+        if (requiresPdfPassword && filePassword.length === 0) {
+          setMessage("Enter the PDF password for this protected statement.");
           return;
         }
 
@@ -50,6 +58,7 @@ export function UploadStatementForm({ cards }: { cards: CardRead[] }) {
               card_id: cardId,
               file_name: selectedFile.name,
               file_storage_key: presign.data.file_storage_key,
+              file_password: requiresPdfPassword ? filePassword : null,
               file_type: inferStatementFileType(selectedFile.name),
               statement_period_start: statementPeriodStart,
               statement_period_end: statementPeriodEnd,
@@ -92,6 +101,27 @@ export function UploadStatementForm({ cards }: { cards: CardRead[] }) {
           <input className="app-input" name="statement_period_end" type="date" required />
         </label>
       </div>
+
+      {requiresPdfPassword ? (
+        <div className="grid gap-2">
+          <label className="text-sm font-medium" htmlFor="statement-file-password">
+            PDF password
+          </label>
+          <input
+            id="statement-file-password"
+            autoComplete="off"
+            className="app-input"
+            name="file_password"
+            type="password"
+            placeholder="Enter the PDF password"
+            required
+            aria-describedby="statement-file-password-help"
+          />
+          <span className="text-xs text-muted" id="statement-file-password-help">
+            Required for password-protected PDFs. The backend stores it encrypted for processing.
+          </span>
+        </div>
+      ) : null}
 
       <UploadDropzone file={selectedFile} onFileChange={setSelectedFile} />
 
